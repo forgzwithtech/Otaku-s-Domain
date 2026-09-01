@@ -161,13 +161,13 @@ export default function Navbar({ guild, setGuild }: NavbarProps) {
           </div>
 
           {/* RIGHT SECTION */}
-          <div className="relative z-10 flex items-center shrink-0 gap-3 sm:gap-6">
+          <div className="relative z-10 flex items-center shrink-0 gap-2 sm:gap-6">
             
             {!user ? (
-              /* STATE 1: NOT LOGGED IN */
+              /* STATE 1: NOT LOGGED IN (VISIBLE ON BOTH MOBILE & DESKTOP) */
               <Link 
                 to="/auth" 
-                className="hidden sm:inline-block group bg-white text-black font-display font-black uppercase px-5 sm:px-6 py-2 sm:py-2.5 skew-x-[-15deg] border-2 border-black hover:bg-[var(--guild-primary)] transition-all shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000]"
+                className="group bg-white text-black font-display font-black uppercase px-3.5 py-1.5 sm:px-6 sm:py-2.5 skew-x-[-15deg] border-2 border-black hover:bg-[var(--guild-primary)] transition-all shadow-[2px_2px_0px_#000] sm:shadow-[3px_3px_0px_#000] hover:-translate-y-0.5 hover:shadow-[5px_5px_0px_#000]"
               >
                 <span className="block skew-x-[15deg] tracking-widest text-xs sm:text-sm">Sign In</span>
               </Link>
@@ -308,15 +308,7 @@ export default function Navbar({ guild, setGuild }: NavbarProps) {
         </div>
 
         <div className="flex flex-col gap-4 pt-6 border-t border-white/10">
-          {!user ? (
-            <Link
-              to="/auth"
-              onClick={() => setMobileMenuOpen(false)}
-              className="w-full text-center bg-white text-black font-display font-black uppercase py-3 border-2 border-black shadow-[4px_4px_0px_#fff]"
-            >
-              Sign In to Syndicate
-            </Link>
-          ) : (
+          {user && (
             <div className="flex items-center justify-between">
               <span className="text-xs font-mono text-zinc-400">FACTION ALIGNMENT:</span>
               <button
