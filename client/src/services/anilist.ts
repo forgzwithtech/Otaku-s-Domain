@@ -70,7 +70,6 @@ interface AniListResponse {
   media: VaultMedia[];
 }
 
-// In-Memory Fast Cache (10-minute TTL)
 const cache = new Map<string, { timestamp: number; data: any }>();
 const CACHE_TTL = 10 * 60 * 1000;
 
@@ -116,7 +115,7 @@ query GetVaultMedia($page: Int, $perPage: Int, $type: MediaType, $search: String
 }
 `;
 
-// in client/src/services/anilist.ts
+// Queries both primary Media data and fetches multiple character pages to exceed the 25 sub-query cap
 const MEDIA_DETAILS_QUERY = `
 query GetMediaDetails($id: Int) {
   Media(id: $id) {
@@ -150,29 +149,77 @@ query GetMediaDetails($id: Int) {
         name
       }
     }
-    characters(sort: [ROLE, FAVOURITES_DESC], perPage: 100) {
+    charPage1: characters(sort: [ROLE, FAVOURITES_DESC], page: 1, perPage: 25) {
+      pageInfo {
+        hasNextPage
+      }
       edges {
         role
         node {
           id
-          name {
-            full
-            native
-          }
-          image {
-            large
-          }
+          name { full native }
+          image { large }
           description(asHtml: false)
           gender
           age
         }
         voiceActors(language: JAPANESE) {
-          name {
-            full
-          }
-          image {
-            large
-          }
+          name { full }
+          image { large }
+          languageV2
+        }
+      }
+    }
+    charPage2: characters(sort: [ROLE, FAVOURITES_DESC], page: 2, perPage: 25) {
+      edges {
+        role
+        node {
+          id
+          name { full native }
+          image { large }
+          description(asHtml: false)
+          gender
+          age
+        }
+        voiceActors(language: JAPANESE) {
+          name { full }
+          image { large }
+          languageV2
+        }
+      }
+    }
+    charPage3: characters(sort: [ROLE, FAVOURITES_DESC], page: 3, perPage: 25) {
+      edges {
+        role
+        node {
+          id
+          name { full native }
+          image { large }
+          description(asHtml: false)
+          gender
+          age
+        }
+        voiceActors(language: JAPANESE) {
+          name { full }
+          image { large }
+          languageV2
+        }
+      }
+    }
+    charPage4: characters(sort: [ROLE, FAVOURITES_DESC], page: 4, perPage: 25) {
+      edges {
+        role
+        node {
+          id
+          name { full native }
+          image { large }
+          description(asHtml: false)
+          gender
+          age
+        }
+        voiceActors(language: JAPANESE) {
+          name { full }
+          image { large }
           languageV2
         }
       }
@@ -286,6 +333,38 @@ export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
   const item = json.data?.Media;
   if (!item) throw new Error("Media detail not found");
 
+  // Combine multi-page character sets (up to 100 characters)
+  const allCharEdges = [
+    ...(item.charPage1?.edges || []),
+    ...(item.charPage2?.edges || []),
+    ...(item.charPage3?.edges || []),
+    ...(item.charPage4?.edges || [])
+  ];
+
+  // De-duplicate by character node ID
+  const seenCharIds = new Set<number>();
+  const characterList: CharacterNode[] = [];
+
+  for (const edge of allCharEdges) {
+    if (!edge?.node?.id || seenCharIds.has(edge.node.id)) continue;
+    seenCharIds.add(edge.node.id);
+    characterList.push({
+      id: edge.node.id,
+      name: edge.node.name?.full || "Operative",
+      nativeName: edge.node.name?.native || null,
+      image: edge.node.image?.large || "https://via.placeholder.com/150",
+      role: edge.role || "Supporting",
+      description: edge.node.description?.replace(/<[^>]*>?/gm, '') || "No classified biography on file for this operative.",
+      gender: edge.node.gender || null,
+      age: edge.node.age || null,
+      voiceActor: edge.voiceActors?.[0] ? {
+        name: edge.voiceActors[0].name?.full || "",
+        image: edge.voiceActors[0].image?.large || "",
+        language: edge.voiceActors[0].languageV2 || "Japanese"
+      } : undefined
+    });
+  }
+
   const result: DetailedMedia = {
     id: item.id,
     title: item.title.english || item.title.romaji,
@@ -305,27 +384,13 @@ export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
     score: item.averageScore,
     trailerUrl: item.trailer?.site === "youtube" ? `https://www.youtube.com/watch?v=${item.trailer.id}` : null,
     studios: item.studios?.nodes?.map((s: any) => s.name) || [],
-    characters: item.characters?.edges?.map((edge: any) => ({
-      id: edge.node.id,
-      name: edge.node.name.full,
-      nativeName: edge.node.name.native,
-      image: edge.node.image.large,
-      role: edge.role,
-      description: edge.node.description?.replace(/<[^>]*>?/gm, '') || "No classified biography on file for this operative.",
-      gender: edge.node.gender,
-      age: edge.node.age,
-      voiceActor: edge.voiceActors?.[0] ? {
-        name: edge.voiceActors[0].name.full,
-        image: edge.voiceActors[0].image.large,
-        language: edge.voiceActors[0].languageV2
-      } : undefined
-    })) || [],
+    characters: characterList,
     relations: item.relations?.edges?.map((edge: any) => ({
       id: edge.node.id,
       title: edge.node.title.english || edge.node.title.romaji,
       type: edge.node.type,
       format: edge.node.format,
-      image: edge.node.coverImage.large,
+      image: edge.node.coverImage?.large,
       relationType: edge.relationType
     })) || []
   };

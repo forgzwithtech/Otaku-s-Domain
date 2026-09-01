@@ -193,7 +193,6 @@ export default function VaultMediaDetail() {
 
   const externalLinks = getExternalMangaLinks(media.title);
 
-  // Filter characters by search term
   const filteredCharacters = media.characters.filter((c) => {
     if (!characterSearch.trim()) return true;
     const q = characterSearch.toLowerCase();
@@ -259,7 +258,7 @@ export default function VaultMediaDetail() {
           </div>
         </div>
 
-        {/* TAB 1: OVERVIEW & ALL CHARACTERS WITH SEARCH */}
+        {/* TAB 1: OVERVIEW & COMPLETE CHARACTER ROSTER */}
         {activeTab === "info" && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
             <div className="lg:col-span-4 flex flex-col gap-4">
@@ -303,7 +302,7 @@ export default function VaultMediaDetail() {
                 <p className="text-sm md:text-base leading-relaxed text-zinc-800 font-medium" style={{ fontFamily: F_MONO }}>{formatBioText(media.description)}</p>
               </div>
 
-              {/* Complete Character Roster with Search */}
+              {/* Complete Character Roster with In-Memory Search */}
               {media.characters.length > 0 && (
                 <div className="border-4 border-black bg-white p-6 md:p-8 shadow-[10px_10px_0px_#000]">
                   <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 pb-4 border-b-2 border-black gap-3">
@@ -316,7 +315,6 @@ export default function VaultMediaDetail() {
                       </span>
                     </div>
 
-                    {/* In-Memory Character Search Bar */}
                     <div className="w-full sm:w-auto relative">
                       <input
                         type="text"
@@ -364,7 +362,6 @@ export default function VaultMediaDetail() {
                     </div>
                   )}
 
-                  {/* See More / See Less Toggle Button */}
                   {filteredCharacters.length > 10 && !characterSearch && (
                     <div className="mt-6 text-center">
                       <button
@@ -382,7 +379,7 @@ export default function VaultMediaDetail() {
           </div>
         )}
 
-        {/* TAB 2: MANGA READER WITH FULLSCREEN CONTROLS */}
+        {/* TAB 2: MANGA READER & VIEWPORT OVERFLOW FIX */}
         {activeTab === "content" && (
           <div className="border-4 border-black bg-white p-4 md:p-8 shadow-[10px_10px_0px_#000] mb-8">
             {media.type === "MANGA" ? (
@@ -434,50 +431,43 @@ export default function VaultMediaDetail() {
                           onTouchStart={handleTouchStart}
                           onTouchEnd={handleTouchEnd}
                           className={`${
-                            isFullScreen ? "fixed inset-0 z-50 bg-[#0c0c0c] p-4 md:p-6 overflow-y-auto flex flex-col justify-between" : "relative select-none"
+                            isFullScreen 
+                              ? "fixed inset-0 z-50 bg-[#0c0c0c] w-screen max-w-[100vw] h-screen p-4 md:p-6 overflow-y-auto overflow-x-hidden flex flex-col justify-between box-border" 
+                              : "relative select-none"
                           }`}
                         >
-                          {/* Dedicated Sticky Fullscreen HUD with Back / Exit Button */}
+                          {/* Single Unified Cyber-HUD Exit Button */}
                           {isFullScreen && (
-                            <div className="w-full flex justify-between items-center bg-black/95 text-white border-2 border-white/30 p-3 mb-4 sticky top-0 z-50 backdrop-blur shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
+                            <div className="w-full max-w-7xl mx-auto flex justify-between items-center bg-black/95 text-white border-2 border-white/30 px-4 py-2.5 mb-4 sticky top-0 z-50 backdrop-blur shadow-[0_4px_20px_rgba(0,0,0,0.8)]">
                               <div className="flex items-center gap-3">
                                 <button
                                   onClick={() => setIsFullScreen(false)}
-                                  className="bg-red-600 text-white font-black uppercase text-xs px-3 py-1.5 border border-white hover:bg-white hover:text-black transition-colors"
+                                  className="bg-red-600 text-white font-black uppercase text-xs px-3.5 py-1.5 border border-white hover:bg-white hover:text-black transition-colors cursor-pointer"
                                   style={{ fontFamily: F_MONO }}
                                 >
-                                  ← Exit Fullscreen (ESC)
+                                  ✕ Exit Fullscreen (ESC)
                                 </button>
                                 <span className="font-bold text-xs md:text-sm uppercase truncate max-w-xs md:max-w-md" style={{ fontFamily: F_DISPLAY }}>
                                   {media.title} — {selectedChapter.title}
                                 </span>
                               </div>
 
-                              <div className="flex items-center gap-2">
-                                <button
-                                  onClick={() => setReaderMode((m) => (m === "webtoon" ? "book" : "webtoon"))}
-                                  className="bg-yellow-400 text-black px-2.5 py-1 text-xs font-bold uppercase"
-                                  style={{ fontFamily: F_MONO }}
-                                >
-                                  {readerMode === "webtoon" ? "Book Mode" : "Webtoon"}
-                                </button>
-                                <button
-                                  onClick={() => { setSelectedChapter(null); setIsFullScreen(false); }}
-                                  className="bg-zinc-800 text-white px-2.5 py-1 text-xs font-bold uppercase hover:bg-red-600"
-                                  style={{ fontFamily: F_MONO }}
-                                >
-                                  Close
-                                </button>
-                              </div>
+                              <button
+                                onClick={() => setReaderMode((m) => (m === "webtoon" ? "book" : "webtoon"))}
+                                className="bg-yellow-400 text-black px-3 py-1 text-xs font-bold uppercase border border-black hover:bg-white"
+                                style={{ fontFamily: F_MONO }}
+                              >
+                                {readerMode === "webtoon" ? "Switch to Book Mode" : "Switch to Webtoon"}
+                              </button>
                             </div>
                           )}
 
                           {/* Webtoon Mode */}
                           {readerMode === "webtoon" && (
-                            <div className="flex flex-col items-center gap-4 max-w-4xl mx-auto w-full">
+                            <div className="flex flex-col items-center gap-4 max-w-4xl mx-auto w-full px-2">
                               {pages.map((url, idx) => (
                                 <div key={idx} className="w-full flex flex-col items-center">
-                                  <img src={url} alt={`Page ${idx + 1}`} loading="lazy" className="w-full border-2 border-black shadow-[6px_6px_0px_#000] bg-zinc-100" />
+                                  <img src={url} alt={`Page ${idx + 1}`} loading="lazy" className="w-full max-w-full border-2 border-black shadow-[6px_6px_0px_#000] bg-zinc-100 object-contain" />
                                   <span className={`text-xs font-bold mt-1 mb-4 ${isFullScreen ? "text-zinc-400" : "text-zinc-600"}`} style={{ fontFamily: F_MONO }}>
                                     Page {idx + 1} of {pages.length}
                                   </span>
@@ -486,23 +476,23 @@ export default function VaultMediaDetail() {
                             </div>
                           )}
 
-                          {/* Dual & Single Page Book Mode */}
+                          {/* Dual & Single Page Book Mode (Right-overflow protected) */}
                           {readerMode === "book" && (
-                            <div className="flex flex-col items-center max-w-6xl mx-auto w-full my-auto">
-                              <div className="relative w-full flex items-center justify-center gap-2 max-h-[80vh] overflow-hidden py-2">
+                            <div className="flex flex-col items-center max-w-5xl mx-auto w-full my-auto px-2 overflow-hidden">
+                              <div className="relative w-full flex items-center justify-center gap-2 max-h-[75vh] overflow-hidden py-2">
                                 <div
                                   onClick={prevBookPage}
-                                  className="relative max-h-[75vh] border-4 border-black bg-white shadow-[10px_10px_0px_#000] cursor-pointer transition-transform active:scale-[0.99] flex items-center justify-center"
+                                  className="relative max-h-[72vh] border-4 border-black bg-white shadow-[10px_10px_0px_#000] cursor-pointer transition-transform active:scale-[0.99] flex items-center justify-center overflow-hidden"
                                 >
-                                  <img src={pages[currentBookPage]} alt={`Page ${currentBookPage + 1}`} className="h-full max-h-[75vh] w-auto object-contain pointer-events-none" />
+                                  <img src={pages[currentBookPage]} alt={`Page ${currentBookPage + 1}`} className="h-full max-h-[72vh] max-w-[45vw] w-auto object-contain pointer-events-none" />
                                 </div>
 
                                 {isDualSpread && currentBookPage + 1 < pages.length && (
                                   <div
                                     onClick={nextBookPage}
-                                    className="relative max-h-[75vh] border-4 border-black bg-white shadow-[10px_10px_0px_#000] cursor-pointer transition-transform active:scale-[0.99] flex items-center justify-center"
+                                    className="relative max-h-[72vh] border-4 border-black bg-white shadow-[10px_10px_0px_#000] cursor-pointer transition-transform active:scale-[0.99] flex items-center justify-center overflow-hidden"
                                   >
-                                    <img src={pages[currentBookPage + 1]} alt={`Page ${currentBookPage + 2}`} className="h-full max-h-[75vh] w-auto object-contain pointer-events-none" />
+                                    <img src={pages[currentBookPage + 1]} alt={`Page ${currentBookPage + 2}`} className="h-full max-h-[72vh] max-w-[45vw] w-auto object-contain pointer-events-none" />
                                   </div>
                                 )}
                               </div>
@@ -528,17 +518,6 @@ export default function VaultMediaDetail() {
                                 Page {currentBookPage + 1} {isDualSpread && currentBookPage + 1 < pages.length ? `& ${currentBookPage + 2}` : ''} of {pages.length} (Swipe or use ← / →)
                               </span>
                             </div>
-                          )}
-
-                          {/* Fullscreen Floating Exit Button at Bottom Right */}
-                          {isFullScreen && (
-                            <button
-                              onClick={() => setIsFullScreen(false)}
-                              className="fixed bottom-6 right-6 bg-black text-white border-2 border-white px-4 py-2 text-xs font-black uppercase shadow-[4px_4px_0px_#fff] hover:bg-red-600 transition-colors z-50"
-                              style={{ fontFamily: F_MONO }}
-                            >
-                              ✕ Exit Fullscreen
-                            </button>
                           )}
                         </div>
                       ) : (
