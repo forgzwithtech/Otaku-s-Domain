@@ -116,6 +116,7 @@ query GetVaultMedia($page: Int, $perPage: Int, $type: MediaType, $search: String
 }
 `;
 
+// in client/src/services/anilist.ts
 const MEDIA_DETAILS_QUERY = `
 query GetMediaDetails($id: Int) {
   Media(id: $id) {
@@ -149,7 +150,7 @@ query GetMediaDetails($id: Int) {
         name
       }
     }
-    characters(sort: [ROLE, FAVOURITES_DESC], perPage: 50) {
+    characters(sort: [ROLE, FAVOURITES_DESC], perPage: 100) {
       edges {
         role
         node {
