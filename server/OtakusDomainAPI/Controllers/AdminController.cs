@@ -253,7 +253,7 @@ public class AdminController : ControllerBase
         return Ok(slide);
     }
 
-    [HttpPut("slides/{id}")]
+ [HttpPut("slides/{id}")]
     public async Task<IActionResult> UpdateSlide(int id, [FromBody] LandingSlide updated)
     {
         var (isAdmin, error) = await EnsureAdminAsync();
@@ -271,6 +271,7 @@ public class AdminController : ControllerBase
         slide.Kanji = updated.Kanji;
         slide.Desc = updated.Desc;
         slide.BtnText = updated.BtnText;
+        slide.TargetUrl = string.IsNullOrWhiteSpace(updated.TargetUrl) ? "/vault" : updated.TargetUrl;
         slide.ImageUrl = updated.ImageUrl;
         slide.MemberName = updated.MemberName;
         slide.MemberAvatar = updated.MemberAvatar;
@@ -280,7 +281,7 @@ public class AdminController : ControllerBase
         await _context.SaveChangesAsync();
         return Ok(slide);
     }
-
+    
     [HttpDelete("slides/{id}")]
     public async Task<IActionResult> DeleteSlide(int id)
     {

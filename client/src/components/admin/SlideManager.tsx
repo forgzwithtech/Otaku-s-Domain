@@ -1,9 +1,20 @@
+// client/src/components/admin/SlideManager.tsx
 import { useState, useEffect, type FormEvent, type ChangeEvent } from "react";
 import { fetchAdminSlides, saveAdminSlide, deleteAdminSlide, fetchAdminUsers } from "../../services/adminApi";
 import { uploadMediaAsset } from "../../services/storage";
 
 const F_DISPLAY = "'Anton', sans-serif";
 const F_MONO = "'Space Mono', monospace";
+
+const DIRECTORY_ROUTES = [
+  { label: "🎟️ Events & Tickets (/events)", value: "/events" },
+  { label: "📚 Anime & Manga Vault (/vault)", value: "/vault" },
+  { label: "🛍️ Merch Store (/store)", value: "/store" },
+  { label: "💬 Community Forum (/forum)", value: "/forum" },
+  { label: "⚔️ User Dashboard (/dashboard)", value: "/dashboard" },
+  { label: "🔐 Auth / Join Portal (/auth)", value: "/auth" },
+  { label: "🔞 Red Light District (/red-light-district)", value: "/red-light-district" },
+];
 
 export default function SlideManager() {
   const [slides, setSlides] = useState<any[]>([]);
@@ -22,7 +33,8 @@ export default function SlideManager() {
     title2: "",
     kanji: "",
     desc: "",
-    btnText: "Learn More",
+    btnText: "Explore Vault",
+    targetUrl: "/vault",
     imageUrl: "",
     memberName: "",
     memberAvatar: "",
@@ -49,7 +61,7 @@ export default function SlideManager() {
 
   useEffect(() => { load(); }, []);
 
-  // Handle Image File Upload directly to Supabase Storage
+  // File Upload to Supabase
   const handleFileUpload = async (e: ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
@@ -67,7 +79,7 @@ export default function SlideManager() {
     }
   };
 
-  // Handle Operative Select (Autofills name and avatar)
+  // Operative Selector
   const handleOperativeSelect = (userId: string) => {
     if (!userId) {
       setForm((prev) => ({ ...prev, memberName: "", memberAvatar: "" }));
@@ -78,14 +90,20 @@ export default function SlideManager() {
       setForm((prev) => ({
         ...prev,
         memberName: selected.displayName || selected.username,
-        memberAvatar: selected.avatarUrl || "",
+        memberAvatar: selected.avatarUrl || `https://api.dicebear.com/7.x/avataaars/svg?seed=${selected.email}&backgroundColor=transparent`,
       }));
     }
   };
 
   const handleEdit = (slide: any) => {
     setEditingSlide(slide);
-    setForm(slide);
+    setForm({
+      ...slide,
+      targetUrl: slide.targetUrl || "/vault",
+      memberQuote: slide.memberQuote || "",
+      memberName: slide.memberName || "",
+      memberAvatar: slide.memberAvatar || "",
+    });
   };
 
   const handleCancel = () => {
@@ -194,14 +212,14 @@ export default function SlideManager() {
             placeholder="Slide Description..."
             value={form.desc}
             onChange={(e) => setForm({ ...form, desc: e.target.value })}
-            className="p-2 border border-black text-xs font-bold bg-white h-20 resize-none"
+            className="p-2 border border-black text-xs font-bold bg-white h-16 resize-none"
             required
           />
 
           <div className="grid grid-cols-2 gap-2">
             <input
               type="text"
-              placeholder="Button Text"
+              placeholder="Button Label (e.g. Grab Tickets)"
               value={form.btnText}
               onChange={(e) => setForm({ ...form, btnText: e.target.value })}
               className="p-2 border border-black text-xs font-bold bg-white"
@@ -216,7 +234,25 @@ export default function SlideManager() {
             />
           </div>
 
-          {/* Image Upload & URL Selector */}
+          {/* Target Route Directory Dropdown */}
+          <div className="border border-black p-3 bg-white flex flex-col gap-1.5">
+            <span className="text-[10px] font-black uppercase text-zinc-600">
+              Button Action / Target Directory ➔
+            </span>
+            <select
+              value={form.targetUrl}
+              onChange={(e) => setForm({ ...form, targetUrl: e.target.value })}
+              className="p-2 border border-black text-xs font-bold bg-[#e8e4d8] uppercase focus:outline-none cursor-pointer"
+            >
+              {DIRECTORY_ROUTES.map((route) => (
+                <option key={route.value} value={route.value}>
+                  {route.label}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Image Upload & URL */}
           <div className="border border-black p-3 bg-white flex flex-col gap-2">
             <span className="text-[10px] font-black uppercase text-zinc-600 block">Slide Artwork Asset</span>
             
@@ -234,7 +270,7 @@ export default function SlideManager() {
               
               <input
                 type="text"
-                placeholder="Or paste image URL (/assets/... or https://)"
+                placeholder="Or paste URL (/assets/... or https://)"
                 value={form.imageUrl}
                 onChange={(e) => setForm({ ...form, imageUrl: e.target.value })}
                 className="flex-1 p-1.5 border border-zinc-300 text-xs font-bold bg-zinc-50"
@@ -252,13 +288,12 @@ export default function SlideManager() {
             )}
           </div>
 
-          {/* Operative Spotlight Autocomplete Picker */}
+          {/* Operative Spotlight & Quote */}
           <div className="border border-black p-3 bg-white flex flex-col gap-2">
             <span className="text-[10px] uppercase font-black text-zinc-600 block">
-              Featured Operative Spotlight (Optional)
+              Featured Operative Spotlight & Quote (Optional)
             </span>
 
-            {/* Dropdown Select from registered users */}
             <select
               onChange={(e) => handleOperativeSelect(e.target.value)}
               className="p-2 border border-black text-xs font-bold bg-[#e8e4d8] uppercase focus:outline-none"
@@ -288,6 +323,15 @@ export default function SlideManager() {
               />
             </div>
 
+            {/* Member Quote Input */}
+            <input
+              type="text"
+              placeholder='Member Quote (e.g. "We will conquer the arena!")'
+              value={form.memberQuote || ""}
+              onChange={(e) => setForm({ ...form, memberQuote: e.target.value })}
+              className="p-2 border border-black text-xs font-bold bg-zinc-50 mt-1"
+            />
+
             {form.memberAvatar && (
               <div className="flex items-center gap-2 mt-1">
                 <img src={form.memberAvatar} alt="Avatar Preview" className="w-8 h-8 rounded-full border border-black object-cover" />
@@ -300,7 +344,7 @@ export default function SlideManager() {
             <button
               type="submit"
               disabled={uploadingImage}
-              className="flex-1 bg-black text-white p-2.5 font-black uppercase text-xs hover:bg-yellow-400 hover:text-black transition-colors disabled:opacity-50"
+              className="flex-1 bg-black text-white p-2.5 font-black uppercase text-xs hover:bg-yellow-400 hover:text-black transition-colors disabled:opacity-50 cursor-pointer"
               style={{ fontFamily: F_DISPLAY }}
             >
               {editingSlide ? "Update Slide" : "+ Add Slide"}
@@ -309,7 +353,7 @@ export default function SlideManager() {
               <button
                 type="button"
                 onClick={handleCancel}
-                className="px-4 bg-zinc-300 text-black font-bold uppercase text-xs border border-black"
+                className="px-4 bg-zinc-300 text-black font-bold uppercase text-xs border border-black cursor-pointer"
               >
                 Cancel
               </button>
@@ -336,25 +380,24 @@ export default function SlideManager() {
                       </h4>
                     </div>
                     <p className="text-xs text-zinc-600 line-clamp-1 mt-1" style={{ fontFamily: F_MONO }}>{s.desc}</p>
-                    {s.memberName && (
-                      <span className="text-[10px] font-bold text-yellow-600 uppercase block mt-0.5" style={{ fontFamily: F_MONO }}>
-                        ★ Spotlight: {s.memberName}
-                      </span>
-                    )}
+                    <div className="flex items-center gap-2 mt-1 text-[10px] font-mono text-zinc-500">
+                      <span className="bg-zinc-100 px-1 border border-zinc-300">Target: {s.targetUrl || "/vault"}</span>
+                      {s.memberQuote && <span className="italic">"{s.memberQuote}"</span>}
+                    </div>
                   </div>
                 </div>
 
                 <div className="flex gap-2 shrink-0">
                   <button
                     onClick={() => handleEdit(s)}
-                    className="px-3 py-1 bg-black text-white hover:bg-yellow-400 hover:text-black text-xs font-bold uppercase"
+                    className="px-3 py-1 bg-black text-white hover:bg-yellow-400 hover:text-black text-xs font-bold uppercase cursor-pointer"
                     style={{ fontFamily: F_MONO }}
                   >
                     Edit
                   </button>
                   <button
                     onClick={() => handleDelete(s.id)}
-                    className="px-3 py-1 bg-red-600 text-white hover:bg-black text-xs font-bold uppercase"
+                    className="px-3 py-1 bg-red-600 text-white hover:bg-black text-xs font-bold uppercase cursor-pointer"
                     style={{ fontFamily: F_MONO }}
                   >
                     ✕

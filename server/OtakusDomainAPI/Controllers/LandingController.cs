@@ -19,13 +19,12 @@ public class LandingController : ControllerBase
     {
         _context = context;
     }
-
-    [HttpGet("slides")]
+[HttpGet("slides")]
     public async Task<ActionResult<IEnumerable<LandingSlide>>> GetSlides()
     {
         var slides = await _context.LandingSlides.OrderBy(s => s.DisplayOrder).ToListAsync();
         
-        // Fallback seed data if database hasn't been seeded yet
+        // Fallback seed data if database hasn't been populated
         if (!slides.Any())
         {
             return Ok(new[]
@@ -34,19 +33,22 @@ public class LandingController : ControllerBase
                     id = 1, panel = "01", tag = "Next IRL Drop", stamp = "EP. 01 — LIVE EVENT", sfx = "GATHER!!",
                     title1 = "Anime", title2 = "Fest", kanji = "オタクコネクト",
                     desc = "500+ fans. One watch party, one cosplay showdown, two guilds fighting for the leaderboard.",
-                    btn = "Grab Your Tickets", imageUrl = "/assets/fest.jpeg", displayOrder = 1
+                    btnText = "Grab Your Tickets", targetUrl = "/events", imageUrl = "/assets/fest.jpeg", displayOrder = 1,
+                    memberName = (string?)null, memberAvatar = (string?)null, memberQuote = (string?)null
                 },
                 new {
                     id = 2, panel = "02", tag = "Seasonal Radar", stamp = "TRANSMISSION // LIVE", sfx = "DROP!",
                     title1 = "Today's", title2 = "Drops", kanji = "最新のリリース",
                     desc = "Demon Slayer Hashira Training Arc Ep 4 is out. Plus, the latest One Piece chapter breakdown is live.",
-                    btn = "Enter The Vault", imageUrl = "/assets/drop.jpg", displayOrder = 2
+                    btnText = "Enter The Vault", targetUrl = "/vault", imageUrl = "/assets/drop.jpg", displayOrder = 2,
+                    memberName = (string?)null, memberAvatar = (string?)null, memberQuote = (string?)null
                 },
                 new {
                     id = 3, panel = "03", tag = "Guild Wars", stamp = "GLOBAL STANDINGS", sfx = "CLASH!!",
                     title1 = "Live", title2 = "Rankings", kanji = "ギルドウォーズ",
                     desc = "Check live faction scores and upload your cosplay to close the gap!",
-                    btn = "View Leaderboard", imageUrl = "/assets/rankings.png", displayOrder = 3
+                    btnText = "View Store & Gear", targetUrl = "/store", imageUrl = "/assets/rankings.png", displayOrder = 3,
+                    memberName = (string?)null, memberAvatar = (string?)null, memberQuote = (string?)null
                 }
             });
         }

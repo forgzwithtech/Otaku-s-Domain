@@ -1,4 +1,6 @@
+// client/src/components/Hero.tsx
 import React, { useState, useEffect, useRef } from "react";
+import { useNavigate } from "react-router-dom";
 import pageFlipSound from "../assets/page.ogg";
 import { supabase } from "../lib/supabase";
 
@@ -24,6 +26,7 @@ interface SlideData {
   title2: string;
   desc: string; 
   btn: string;
+  targetUrl?: string;
   image: string;
   kanji: string;
   member?: SlideMember;
@@ -110,6 +113,30 @@ function SfxBurst({ text, className = "", triggerAnim = false }: { text: string;
 }
 
 function SlidePanel({ slide, isFlipping = false }: { slide: SlideData; isFlipping?: boolean }) {
+  const navigate = useNavigate();
+
+  const handleActionClick = () => {
+    if (slide.targetUrl) {
+      navigate(slide.targetUrl);
+      return;
+    }
+    // Intelligent fallback based on button text / panel keywords
+    const btnLow = slide.btn.toLowerCase();
+    if (btnLow.includes("ticket") || btnLow.includes("event") || btnLow.includes("fest")) {
+      navigate("/events");
+    } else if (btnLow.includes("vault") || btnLow.includes("watch") || btnLow.includes("manga")) {
+      navigate("/vault");
+    } else if (btnLow.includes("store") || btnLow.includes("merch") || btnLow.includes("gear")) {
+      navigate("/store");
+    } else if (btnLow.includes("forum") || btnLow.includes("discuss")) {
+      navigate("/forum");
+    } else if (btnLow.includes("leaderboard") || btnLow.includes("rank") || btnLow.includes("guild")) {
+      navigate("/dashboard");
+    } else {
+      navigate("/vault");
+    }
+  };
+
   return (
     <div className="absolute inset-0 bg-[#e8e4d8] overflow-hidden flex flex-col p-4 md:p-6 gap-4">
       <div className="absolute inset-0 opacity-20 pointer-events-none" style={halftoneDark} />
@@ -133,7 +160,7 @@ function SlidePanel({ slide, isFlipping = false }: { slide: SlideData; isFlippin
           </h1>
           {slide.member ? (
              <div className="flex items-center gap-3 bg-zinc-100 p-2 border-2 border-dashed border-black">
-               <img src={slide.member.avatar} alt={slide.member.name} className="w-10 h-10 border-2 border-black object-cover grayscale" />
+               <img src={slide.member.avatar} alt={slide.member.name} className="w-10 h-10 border-2 border-black object-cover rounded-full" />
                <div>
                  <p className="text-black text-[10px] uppercase font-bold" style={{ fontFamily: F_MONO }}>{slide.member.name}</p>
                  <p className="text-black/80 text-xs font-bold italic leading-tight">"{slide.member.quote}"</p>
@@ -147,8 +174,12 @@ function SlidePanel({ slide, isFlipping = false }: { slide: SlideData; isFlippin
         </div>
 
         <div className="shrink-0 flex items-center justify-center">
-          <button className="ink-box bg-black text-white px-8 py-6 uppercase tracking-widest text-lg hover:bg-[var(--guild-primary)] hover:text-black transition-all shadow-[6px_6px_0px_var(--guild-primary)] hover:shadow-[8px_8px_0px_#000] active:translate-y-2 active:shadow-none -rotate-2" style={{ fontFamily: F_DISPLAY }}>
-            {slide.btn}
+          <button
+            onClick={handleActionClick}
+            className="ink-box bg-black text-white px-8 py-6 uppercase tracking-widest text-lg hover:bg-[var(--guild-primary)] hover:text-black transition-all shadow-[6px_6px_0px_var(--guild-primary)] hover:shadow-[8px_8px_0px_#000] active:translate-y-2 active:shadow-none -rotate-2 cursor-pointer"
+            style={{ fontFamily: F_DISPLAY }}
+          >
+            {slide.btn} ➔
           </button>
         </div>
       </div>
@@ -168,7 +199,6 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
   const [socialHandle, setSocialHandle] = useState("");
   const [recruitStatus, setRecruitStatus] = useState<string | null>(null);
   
-  // Persistence via localStorage keyed by today's date string
   const todayKey = `trial_solved_${new Date().toISOString().split('T')[0]}`;
   const [isCompleted, setIsCompleted] = useState<boolean>(() => {
     return localStorage.getItem(todayKey) === "true";
@@ -204,10 +234,11 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
             title1: s.title1,
             title2: s.title2,
             desc: s.desc,
-            btn: s.btnText || s.btn,
+            btn: s.btnText || s.btn || "Explore",
+            targetUrl: s.targetUrl || "/vault",
             image: s.imageUrl || s.image,
             kanji: s.kanji,
-            member: s.memberName ? { name: s.memberName, avatar: s.memberAvatar, quote: s.memberQuote } : undefined
+            member: s.memberName ? { name: s.memberName, avatar: s.memberAvatar, quote: s.memberQuote || "Leading the charge!" } : undefined
           }));
           if (formattedSlides.length > 0) setSlides(formattedSlides);
         }
@@ -362,18 +393,18 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
         )}
 
         <div className="absolute -bottom-5 right-6 z-40 flex items-center gap-3">
-          <button onClick={() => setIsMuted(!isMuted)} className="ink-box bg-white w-12 h-12 flex items-center justify-center text-black hover:bg-[var(--guild-secondary)] shadow-[4px_4px_0px_#000] active:translate-y-1 transition-all" aria-label="Toggle Page Flip Sound">
+          <button onClick={() => setIsMuted(!isMuted)} className="ink-box bg-white w-12 h-12 flex items-center justify-center text-black hover:bg-[var(--guild-secondary)] shadow-[4px_4px_0px_#000] active:translate-y-1 transition-all cursor-pointer" aria-label="Toggle Page Flip Sound">
             {isMuted ? <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 5L6 9H2v6h4l5 4V5z M23 9l-6 6 M17 9l6 6"/></svg> : <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M11 5L6 9H2v6h4l5 4V5z M19.07 4.93a10 10 0 0 1 0 14.14M15.54 8.46a5 5 0 0 1 0 7.07"/></svg>}
           </button>
           <div className="flex gap-1 ink-box bg-white p-1 shadow-[4px_4px_0px_#000]">
-            <button onClick={handlePrev} className="w-10 h-10 bg-black text-white hover:bg-[var(--guild-primary)] flex justify-center items-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M15 18l-6-6 6-6"/></svg></button>
-            <button onClick={handleNext} className="w-10 h-10 bg-black text-white hover:bg-[var(--guild-primary)] flex justify-center items-center"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M9 18l6-6-6-6"/></svg></button>
+            <button onClick={handlePrev} className="w-10 h-10 bg-black text-white hover:bg-[var(--guild-primary)] flex justify-center items-center cursor-pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M15 18l-6-6 6-6"/></svg></button>
+            <button onClick={handleNext} className="w-10 h-10 bg-black text-white hover:bg-[var(--guild-primary)] flex justify-center items-center cursor-pointer"><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3"><path d="M9 18l6-6-6-6"/></svg></button>
           </div>
         </div>
 
         <div className="absolute top-1/2 -left-4 -translate-y-1/2 flex flex-col gap-2 z-0">
           {slides.map((s, i) => (
-             <button key={s.id} onClick={() => handleJump(i)} className={`w-12 h-14 ink-box flex items-center justify-center transition-transform hover:-translate-x-2 ${i === current ? 'bg-[var(--guild-primary)] -translate-x-3' : 'bg-white'}`} style={{ borderLeft: 'none', borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
+             <button key={s.id} onClick={() => handleJump(i)} className={`w-12 h-14 ink-box flex items-center justify-center transition-transform hover:-translate-x-2 cursor-pointer ${i === current ? 'bg-[var(--guild-primary)] -translate-x-3' : 'bg-white'}`} style={{ borderLeft: 'none', borderTopLeftRadius: 0, borderBottomLeftRadius: 0 }}>
                <span className="font-black text-black -rotate-90" style={{ fontFamily: F_DISPLAY }}>{s.panel}</span>
              </button>
           ))}
@@ -402,7 +433,7 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
             ) : (
               <form onSubmit={handleTriviaSubmit} className="w-full flex flex-col gap-3">
                 <input type="text" value={answerInput} onChange={(e) => setAnswerInput(e.target.value)} placeholder="Enter your answer..." className="w-full bg-white text-black font-bold px-4 py-2 border-2 border-black ink-box text-sm focus:outline-none" style={{ fontFamily: F_MONO }} required />
-                <button type="submit" className="w-full py-3 ink-box bg-[var(--guild-primary)] text-black uppercase text-lg tracking-widest hover:bg-white transition-all shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-2 active:shadow-none shrink-0" style={{ fontFamily: F_DISPLAY }}>
+                <button type="submit" className="w-full py-3 ink-box bg-[var(--guild-primary)] text-black uppercase text-lg tracking-widest hover:bg-white transition-all shadow-[6px_6px_0px_rgba(0,0,0,1)] active:translate-y-2 active:shadow-none shrink-0 cursor-pointer" style={{ fontFamily: F_DISPLAY }}>
                   Submit Answer
                 </button>
               </form>
@@ -425,7 +456,7 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
 
             <div className="flex w-full shadow-[6px_6px_0px_rgba(0,0,0,1)]">
               <input type="text" value={socialHandle} onChange={(e) => setSocialHandle(e.target.value)} placeholder="@your_insta" className="flex-1 bg-white border-y-4 border-l-4 border-black px-4 py-3 focus:outline-none text-black font-bold placeholder-gray-400" style={{ fontFamily: F_MONO }} required />
-              <button type="submit" className="bg-black text-white border-4 border-black uppercase text-lg px-6 py-3 hover:bg-[var(--guild-primary)] hover:text-black transition-colors" style={{ fontFamily: F_DISPLAY }}>Go</button>
+              <button type="submit" className="bg-black text-white border-4 border-black uppercase text-lg px-6 py-3 hover:bg-[var(--guild-primary)] hover:text-black transition-colors cursor-pointer" style={{ fontFamily: F_DISPLAY }}>Go</button>
             </div>
 
             {recruitStatus && (

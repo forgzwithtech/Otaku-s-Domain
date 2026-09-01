@@ -16,8 +16,9 @@ public class LandingSlide
     public string Desc { get; set; } = string.Empty;
     public string BtnText { get; set; } = string.Empty;
     public string ImageUrl { get; set; } = string.Empty;
+    public string TargetUrl { get; set; } = "/vault";
     
-    // Optional member feature slot for birthdays/spotlight
+    // Member feature slot for birthdays/spotlights
     public string? MemberName { get; set; }
     public string? MemberAvatar { get; set; }
     public string? MemberQuote { get; set; }
