@@ -189,7 +189,7 @@ export default function SuggestionFooter() {
 
           {/* EMBERZ TECHNOLOGY IMPRINT (The ISBN Barcode Block) */}
           <a 
-            href="mailto:domainotakus@gmail.com" 
+            href="https://emberz-technology.vercel.app/" 
             className="group flex flex-col items-center bg-white p-4 ink-box-footer shadow-[8px_8px_0px_rgba(255,255,255,0.1)] hover:shadow-[10px_10px_0px_var(--guild-primary)] hover:-translate-y-1 transition-all rotate-[-1deg] w-full max-w-[280px]"
           >
             {/* The Barcode */}
