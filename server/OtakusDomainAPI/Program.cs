@@ -28,7 +28,7 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("OtakusDomainPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://your-frontend-domain.vercel.app")
+        policy.WithOrigins("http://localhost:5173", "https://theotakusdomain.vercel.app")
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
