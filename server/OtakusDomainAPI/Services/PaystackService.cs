@@ -132,4 +132,9 @@ public class PaystackService : IPaystackService
 
         return computed.Equals(paystackSignatureHeader.Trim(), StringComparison.OrdinalIgnoreCase);
     }
+
+    internal async Task VerifyTransaction(string reference)
+    {
+        throw new NotImplementedException();
+    }
 }

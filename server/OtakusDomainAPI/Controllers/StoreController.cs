@@ -113,7 +113,7 @@ public class StoreController : ControllerBase
 
         var orderNumber = $"OD-AKR-{Guid.NewGuid().ToString("N")[..8].ToUpper()}";
         var reference = $"OD_MERCH_{Guid.NewGuid().ToString("N")[..12].ToUpper()}";
-        var callbackUrl = _config["Paystack:StoreCallbackUrl"] ?? "http://localhost:5173/store/order-success";
+        var callbackUrl = _config["Paystack:StoreCallbackUrl"] ?? "https://theotakusdomain.vercel.app/store/order-success";
 
         var order = new StoreOrder
         {
@@ -165,4 +165,5 @@ public class StoreController : ControllerBase
             reference
         });
     }
+    
 }

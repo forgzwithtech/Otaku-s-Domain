@@ -109,7 +109,7 @@ public class PaymentsController : ControllerBase
         }
 
         var reference = $"OD_EVT_{Guid.NewGuid().ToString("N")[..12].ToUpper()}";
-        var callbackUrl = _config["Paystack:CallbackUrl"] ?? "http://localhost:5173/events/payment-success";
+        var callbackUrl = _config["Paystack:CallbackUrl"] ?? "https://otaku-s-domain.onrender.com/events/payment-success";
 
         var pass = new EventTicketPass
         {
