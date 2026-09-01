@@ -3,7 +3,6 @@ import { Link } from "react-router-dom";
 import { scanGatekeeperTicket } from "../../services/eventsApi";
 
 const F_DISPLAY = "'Anton', sans-serif";
-const F_MONO = "'Space Mono', monospace";
 
 export default function GatekeeperScanner() {
   const [cameraActive, setCameraActive] = useState(false);

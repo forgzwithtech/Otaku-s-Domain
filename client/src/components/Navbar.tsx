@@ -83,7 +83,6 @@ export default function Navbar({ guild, setGuild }: NavbarProps) {
 
   const isAdmin = userRole === 'Admin';
   const isMod = userRole === 'Moderator';
-  const isStaff = isAdmin || isMod;
 
   const currentAvatar = avatarUrl || (user ? `https://api.dicebear.com/7.x/avataaars/svg?seed=${user.email}&backgroundColor=transparent` : '');
 

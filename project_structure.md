@@ -1,18 +1,19 @@
 # 📁 OtakusDomainWeb - Project Structure
 
-*Generated on: 8/24/2026, 10:09:10 PM*
+*Generated on: 9/1/2026, 9:23:16 AM*
 
 ## 📋 Quick Overview
 
 | Metric | Value |
 |--------|-------|
-| 📄 Total Files | 58 |
-| 📁 Total Folders | 18 |
+| 📄 Total Files | 124 |
+| 📁 Total Folders | 27 |
 | 🌳 Max Depth | 4 levels |
 | 🛠️ Tech Stack | React, TypeScript, CSS, Node.js |
 
 ## ⭐ Important Files
 
+- 🟡 🚫 **.gitignore** - Git ignore rules
 - 🟡 🚫 **.gitignore** - Git ignore rules
 - 🟡 🔒 **package-lock.json** - Dependency lock
 - 🔴 📦 **package.json** - Package configuration
@@ -23,46 +24,48 @@
 
 ### By File Type
 
-- ⚛️ **.tsx** (React TypeScript files): 15 files (25.9%)
-- 📄 **.cs** (Other files): 11 files (19.0%)
-- ⚙️ **.json** (JSON files): 9 files (15.5%)
-- 🖼️ **.png** (PNG images): 5 files (8.6%)
-- 🎨 **.svg** (SVG images): 4 files (6.9%)
-- 🔷 **.ts** (TypeScript files): 3 files (5.2%)
-- 📖 **.md** (Markdown files): 2 files (3.4%)
-- 🎨 **.css** (Stylesheets): 2 files (3.4%)
-- 🚫 **.gitignore** (Git ignore): 1 files (1.7%)
-- 🌐 **.html** (HTML files): 1 files (1.7%)
-- 🖼️ **.jpg** (JPEG images): 1 files (1.7%)
-- 🖼️ **.jpeg** (JPEG images): 1 files (1.7%)
-- 📄 **.ogg** (Other files): 1 files (1.7%)
-- 📄 **.csproj** (Other files): 1 files (1.7%)
-- 📄 **.http** (Other files): 1 files (1.7%)
+- ⚛️ **.tsx** (React TypeScript files): 42 files (33.9%)
+- 📄 **.cs** (Other files): 38 files (30.6%)
+- 🔷 **.ts** (TypeScript files): 11 files (8.9%)
+- ⚙️ **.json** (JSON files): 9 files (7.3%)
+- 🖼️ **.png** (PNG images): 6 files (4.8%)
+- 🎨 **.svg** (SVG images): 4 files (3.2%)
+- 📖 **.md** (Markdown files): 3 files (2.4%)
+- 🚫 **.gitignore** (Git ignore): 2 files (1.6%)
+- 🎨 **.css** (Stylesheets): 2 files (1.6%)
+- 🌐 **.html** (HTML files): 1 files (0.8%)
+- 🖼️ **.jpg** (JPEG images): 1 files (0.8%)
+- 🖼️ **.jpeg** (JPEG images): 1 files (0.8%)
+- 📄 **.mp4** (Other files): 1 files (0.8%)
+- 📄 **.ogg** (Other files): 1 files (0.8%)
+- 📄 **.csproj** (Other files): 1 files (0.8%)
+- 📄 **.http** (Other files): 1 files (0.8%)
 
 ### By Category
 
-- **React**: 15 files (25.9%)
-- **Other**: 14 files (24.1%)
-- **Assets**: 11 files (19.0%)
-- **Config**: 9 files (15.5%)
-- **TypeScript**: 3 files (5.2%)
-- **Docs**: 2 files (3.4%)
-- **Styles**: 2 files (3.4%)
-- **DevOps**: 1 files (1.7%)
-- **Web**: 1 files (1.7%)
+- **React**: 42 files (33.9%)
+- **Other**: 42 files (33.9%)
+- **Assets**: 12 files (9.7%)
+- **TypeScript**: 11 files (8.9%)
+- **Config**: 9 files (7.3%)
+- **Docs**: 3 files (2.4%)
+- **DevOps**: 2 files (1.6%)
+- **Styles**: 2 files (1.6%)
+- **Web**: 1 files (0.8%)
 
 ### 📁 Largest Directories
 
-- **root**: 58 files
-- **client**: 42 files
-- **client\src**: 29 files
-- **server\OtakusDomainAPI**: 16 files
-- **server**: 16 files
+- **root**: 124 files
+- **client**: 79 files
+- **client\src**: 66 files
+- **server\OtakusDomainAPI**: 43 files
+- **server**: 43 files
 
 ## 🌳 Directory Structure
 
 ```
 OtakusDomainWeb/
+├── 🟡 🚫 **.gitignore**
 ├── 📂 client/
 │   ├── 🟡 🚫 **.gitignore**
 │   ├── ⚙️ .oxlintrc.json
@@ -79,9 +82,11 @@ OtakusDomainWeb/
 │   │   ├── ⚛️ App.tsx
 │   │   ├── 📦 assets/
 │   │   │   ├── 🖼️ bluelogo.png
+│   │   │   ├── 🖼️ cover.png
 │   │   │   ├── 🖼️ drop.jpg
 │   │   │   ├── 🖼️ fest.jpeg
 │   │   │   ├── 🖼️ hero.png
+│   │   │   ├── 📄 merchvid.mp4
 │   │   │   ├── 📄 page.ogg
 │   │   │   ├── 🖼️ rankings.png
 │   │   │   ├── 🎨 react.svg
@@ -89,8 +94,22 @@ OtakusDomainWeb/
 │   │   │   ├── 🖼️ RedlogoDark.png
 │   │   │   └── 🎨 vite.svg
 │   │   ├── 🧩 components/
+│   │   │   ├── 📂 admin/
+│   │   │   │   ├── ⚛️ AdminTelemetry.tsx
+│   │   │   │   ├── ⚛️ EventsManager.tsx
+│   │   │   │   ├── ⚛️ RecruitmentQueue.tsx
+│   │   │   │   ├── ⚛️ SlideManager.tsx
+│   │   │   │   ├── ⚛️ SponsorsManager.tsx
+│   │   │   │   ├── ⚛️ StoreManager.tsx
+│   │   │   │   ├── ⚛️ TrialPipeline.tsx
+│   │   │   │   ├── ⚛️ TrialScheduler.tsx
+│   │   │   │   └── ⚛️ UserManagement.tsx
 │   │   │   ├── 📂 dashboard/
-│   │   │   │   └── ⚛️ DashboardHeader.tsx
+│   │   │   │   ├── ⚛️ DashboardHeader.tsx
+│   │   │   │   └── ⚛️ WalletStatsCard.tsx
+│   │   │   ├── 📂 forum/
+│   │   │   │   ├── ⚛️ ForumFloatingDock.tsx
+│   │   │   │   └── ⚛️ GenderGatekeeperModal.tsx
 │   │   │   ├── ⚛️ GlobalBackground.tsx
 │   │   │   ├── ⚛️ GuildInvites.tsx
 │   │   │   ├── ⚛️ Hero.tsx
@@ -99,6 +118,8 @@ OtakusDomainWeb/
 │   │   │   ├── ⚛️ Register.tsx
 │   │   │   ├── ⚛️ SocialAuthButtons.tsx
 │   │   │   ├── ⚛️ SocialPulse.tsx
+│   │   │   ├── 📂 store/
+│   │   │   │   └── ⚛️ StoreNavbar.tsx
 │   │   │   ├── ⚛️ SuggestionFooter.tsx
 │   │   │   └── ⚛️ VaultGateway.tsx
 │   │   ├── 🎨 index.css
@@ -107,38 +128,94 @@ OtakusDomainWeb/
 │   │   ├── ⚛️ main.tsx
 │   │   ├── 📄 pages/
 │   │   │   ├── ⚛️ AuthGateway.tsx
-│   │   │   └── ⚛️ Home.tsx
-│   │   └── 📂 services/
-│   │   │   └── 🔷 api.ts
+│   │   │   ├── ⚛️ Dashboard.tsx
+│   │   │   ├── 📂 events/
+│   │   │   │   └── ⚛️ PaymentSuccessful.tsx
+│   │   │   ├── ⚛️ Events.tsx
+│   │   │   ├── 📂 forum/
+│   │   │   │   └── ⚛️ ForumThreadDetails.tsx
+│   │   │   ├── ⚛️ Forum.tsx
+│   │   │   ├── ⚛️ Home.tsx
+│   │   │   ├── 📂 interpool/
+│   │   │   │   ├── ⚛️ Admin.tsx
+│   │   │   │   ├── ⚛️ GateKeeeperScanner.tsx
+│   │   │   │   └── ⚛️ ModeratorDashboard.tsx
+│   │   │   ├── ⚛️ RedLightDistrict.tsx
+│   │   │   ├── 📂 store/
+│   │   │   │   ├── ⚛️ ProductDetails.tsx
+│   │   │   │   └── ⚛️ StoreBag.tsx
+│   │   │   ├── ⚛️ Store.tsx
+│   │   │   ├── ⚛️ Vault.tsx
+│   │   │   └── ⚛️ VaultMediaDetail.tsx
+│   │   ├── 📂 services/
+│   │   │   ├── 🔷 adminApi.ts
+│   │   │   ├── 🔷 anilist.ts
+│   │   │   ├── 🔷 api.ts
+│   │   │   ├── 🔷 eventsApi.ts
+│   │   │   ├── 🔷 forumApi.ts
+│   │   │   ├── 🔷 mangaDexEngine.ts
+│   │   │   ├── 🔷 storage.ts
+│   │   │   └── 🔷 storeApi.ts
+│   │   └── 🔧 utils/
+│   │   │   └── 🔷 genter.ts
 │   ├── ⚙️ tsconfig.app.json
 │   ├── 🟡 🔷 **tsconfig.json**
 │   ├── ⚙️ tsconfig.node.json
 │   └── 🔷 vite.config.ts
+├── 📖 project_structure.md
 └── 📂 server/
 │   └── 📂 OtakusDomainAPI/
 │   │   ├── ⚙️ appsettings.Development.json
 │   │   ├── ⚙️ appsettings.json
 │   │   ├── 📂 Controllers/
-│   │   │   └── 📄 AuthController.cs
+│   │   │   ├── 📄 AdminController.cs
+│   │   │   ├── 📄 AdminEventController.cs
+│   │   │   ├── 📄 AdminStoreController.cs
+│   │   │   ├── 📄 AuthController.cs
+│   │   │   ├── 📄 EventController.cs
+│   │   │   ├── 📄 ForumController.cs
+│   │   │   ├── 📄 GuildController.cs
+│   │   │   ├── 📄 LandingController.cs
+│   │   │   ├── 📄 PaymentsController.cs
+│   │   │   ├── 📄 QuestsController.cs
+│   │   │   └── 📄 StoreController.cs
 │   │   ├── 📂 Data/
 │   │   │   └── 📄 AppDbContext.cs
 │   │   ├── 📂 DTOs/
-│   │   │   ├── 📄 SetGuildDto.cs
-│   │   │   └── 📄 UserProfileDto.cs
+│   │   │   └── 📄 Dto.cs
 │   │   ├── 📂 Enums/
 │   │   │   ├── 📄 GuildFaction.cs
 │   │   │   └── 📄 UserRole.cs
 │   │   ├── 📂 Migrations/
 │   │   │   ├── 📄 20260824191801_InitialAuthAndProfiles.cs
 │   │   │   ├── 📄 20260824191801_InitialAuthAndProfiles.Designer.cs
+│   │   │   ├── 📄 20260824225827_heroandnav.cs
+│   │   │   ├── 📄 20260824225827_heroandnav.Designer.cs
+│   │   │   ├── 📄 20260824234400_heroa.cs
+│   │   │   ├── 📄 20260824234400_heroa.Designer.cs
+│   │   │   ├── 📄 20260825004002_sponsors.cs
+│   │   │   ├── 📄 20260825004002_sponsors.Designer.cs
+│   │   │   ├── 📄 20260825041012_somestuff.cs
+│   │   │   ├── 📄 20260825041012_somestuff.Designer.cs
+│   │   │   ├── 📄 20260825103710_somestufelsef.cs
+│   │   │   ├── 📄 20260825103710_somestufelsef.Designer.cs
 │   │   │   └── 📄 AppDbContextModelSnapshot.cs
 │   │   ├── 📂 Models/
+│   │   │   ├── 📄 Event.cs
+│   │   │   ├── 📄 Forum.cs
+│   │   │   ├── 📄 LandingContent.cs
+│   │   │   ├── 📄 RecruitmentSubmission.cs
+│   │   │   ├── 📄 Sponsors.cs
+│   │   │   ├── 📄 Store.cs
 │   │   │   └── 📄 UserProfile.cs
 │   │   ├── 📄 OtakusDomainAPI.csproj
 │   │   ├── 📄 OtakusDomainAPI.http
 │   │   ├── 📄 Program.cs
-│   │   └── 📂 Properties/
+│   │   ├── 📂 Properties/
 │   │   │   └── ⚙️ launchSettings.json
+│   │   └── 📂 Services/
+│   │   │   ├── 📄 EmailService.cs
+│   │   │   └── 📄 PaystackService.cs
 ```
 
 ## 📖 Legend

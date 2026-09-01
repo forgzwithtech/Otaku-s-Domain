@@ -3,7 +3,6 @@ import { uploadMediaAsset } from "../../services/storage";
 import { supabase } from "../../lib/supabase";
 
 const F_DISPLAY = "'Anton', sans-serif";
-const F_MONO = "'Space Mono', monospace";
 
 const STANDARD_SIZES = ["XS", "S", "M", "L", "XL", "XXL", "3XL", "ONE SIZE"];
 

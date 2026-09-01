@@ -7,7 +7,6 @@ import TrialPipeline from "../../components/admin/TrialPipeline";
 import RecruitmentQueue from "../../components/admin/RecruitmentQueue";
 
 const F_DISPLAY = "'Anton', sans-serif";
-const F_MONO = "'Space Mono', monospace";
 
 export default function ModeratorDashboard() {
   const navigate = useNavigate();
