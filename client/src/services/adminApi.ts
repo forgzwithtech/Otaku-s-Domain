@@ -1,6 +1,6 @@
 import { supabase } from "../lib/supabase";
 
-const API_BASE = import.meta.env.VITE_API_BASE_URL || "http://localhost:5101/api";
+const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://otaku-s-domain.onrender.com/api";
 
 async function authHeaders() {
   const { data: { session } } = await supabase.auth.getSession();

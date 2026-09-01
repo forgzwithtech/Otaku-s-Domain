@@ -1,6 +1,6 @@
 import { supabase } from '../lib/supabase';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
 
 async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
@@ -69,7 +69,7 @@ export async function claimQuestPoints(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return null;
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+  const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
   try {
     const res = await fetch(`${apiBase}/quests/claim-activity`, {
       method: "POST",

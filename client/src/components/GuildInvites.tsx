@@ -117,7 +117,7 @@ export default function GuildInvites() {
 
   useEffect(() => {
     async function loadData() {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
       try {
         const [statsRes, sponsorsRes] = await Promise.all([
           fetch(`${apiBase}/guild/stats`),
@@ -146,7 +146,7 @@ export default function GuildInvites() {
   }, []);
 
   const openLeaderboard = async () => {
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -179,7 +179,7 @@ export default function GuildInvites() {
   }, [activeModal, leaderboard, leaderboardTab]);
 
   const handleAction = async (actionFaction: 'Blue' | 'Red' | 'None') => {
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;

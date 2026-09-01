@@ -56,7 +56,7 @@ export default function StoreManager() {
   const [riderContact, setRiderContact] = useState("Simbi Logistics (+234 810 123 4567)");
   const [sendingDispatch, setSendingDispatch] = useState(false);
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || "http://localhost:5101/api";
+  const apiBase = import.meta.env.VITE_API_BASE_URL || "https://otaku-s-domain.onrender.com/api";
 
   const loadData = async () => {
     const { data: { session } } = await supabase.auth.getSession();

@@ -186,7 +186,7 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
 
   useEffect(() => {
     async function fetchLandingData() {
-      const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+      const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
       try {
         const [slidesRes, trialRes] = await Promise.all([
           fetch(`${apiBase}/landing/slides`),
@@ -272,7 +272,7 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
     e.preventDefault();
     if (!answerInput.trim() || isCompleted) return;
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
     try {
       const { data: { session } } = await supabase.auth.getSession();
       const token = session?.access_token;
@@ -308,7 +308,7 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
     e.preventDefault();
     if (!socialHandle.trim()) return;
 
-    const apiBase = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
+    const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
     try {
       const res = await fetch(`${apiBase}/landing/recruit`, {
         method: 'POST',
