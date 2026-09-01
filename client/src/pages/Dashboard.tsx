@@ -21,7 +21,6 @@ interface UserProfile {
 }
 
 const F_DISPLAY = "'Anton', sans-serif";
-const F_MONO = "'Space Mono', monospace";
 
 function useDashboardMangaAssets() {
   useEffect(() => {

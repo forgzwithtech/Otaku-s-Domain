@@ -69,7 +69,7 @@ export async function uploadCompressedAvatar(file: File, userId: string): Promis
   const compressedBlob = await compressAvatarImage(file);
   const fileName = `avatars/${userId}_${Date.now()}.webp`;
 
-  const { data, error } = await supabase.storage
+  const { error } = await supabase.storage
     .from('media-assets')
     .upload(fileName, compressedBlob, {
       contentType: 'image/webp',

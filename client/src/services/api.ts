@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:5101/api';
 
 async function getAuthHeaders() {
-  const { data: { session }, error } = await supabase.auth.getSession();
+  const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
 
   console.log("Supabase Session Active:", !!session);
