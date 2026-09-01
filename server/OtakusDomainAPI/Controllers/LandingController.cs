@@ -1,0 +1,167 @@
+using System.Security.Claims;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
+using OtakusDomainAPI.Data;
+using OtakusDomainAPI.DTOs;
+using OtakusDomainAPI.Enums;
+using OtakusDomainAPI.Models;
+
+namespace OtakusDomainAPI.Controllers;
+
+[ApiController]
+[Route("api/[controller]")]
+public class LandingController : ControllerBase
+{
+    private readonly AppDbContext _context;
+
+    public LandingController(AppDbContext context)
+    {
+        _context = context;
+    }
+
+    [HttpGet("slides")]
+    public async Task<ActionResult<IEnumerable<LandingSlide>>> GetSlides()
+    {
+        var slides = await _context.LandingSlides.OrderBy(s => s.DisplayOrder).ToListAsync();
+        
+        // Fallback seed data if database hasn't been seeded yet
+        if (!slides.Any())
+        {
+            return Ok(new[]
+            {
+                new {
+                    id = 1, panel = "01", tag = "Next IRL Drop", stamp = "EP. 01 — LIVE EVENT", sfx = "GATHER!!",
+                    title1 = "Anime", title2 = "Fest", kanji = "オタクコネクト",
+                    desc = "500+ fans. One watch party, one cosplay showdown, two guilds fighting for the leaderboard.",
+                    btn = "Grab Your Tickets", imageUrl = "/assets/fest.jpeg", displayOrder = 1
+                },
+                new {
+                    id = 2, panel = "02", tag = "Seasonal Radar", stamp = "TRANSMISSION // LIVE", sfx = "DROP!",
+                    title1 = "Today's", title2 = "Drops", kanji = "最新のリリース",
+                    desc = "Demon Slayer Hashira Training Arc Ep 4 is out. Plus, the latest One Piece chapter breakdown is live.",
+                    btn = "Enter The Vault", imageUrl = "/assets/drop.jpg", displayOrder = 2
+                },
+                new {
+                    id = 3, panel = "03", tag = "Guild Wars", stamp = "GLOBAL STANDINGS", sfx = "CLASH!!",
+                    title1 = "Live", title2 = "Rankings", kanji = "ギルドウォーズ",
+                    desc = "Check live faction scores and upload your cosplay to close the gap!",
+                    btn = "View Leaderboard", imageUrl = "/assets/rankings.png", displayOrder = 3
+                }
+            });
+        }
+
+        return Ok(slides);
+    }
+
+    [HttpGet("daily-trial")]
+    public async Task<ActionResult<DailyTrial>> GetActiveTrial()
+    {
+        var today = DateTime.UtcNow.Date;
+        var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today) 
+                    ?? new DailyTrial { Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", RewardPoints = 50 };
+        return Ok(trial);
+    }
+
+[HttpPost("submit-trial")]
+[Authorize]
+public async Task<IActionResult> SubmitTrial([FromBody] TriviaSubmissionDto dto)
+{
+    var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+    if (!Guid.TryParse(userIdString, out var userId))
+        return Unauthorized("Invalid token subject.");
+
+    var user = await _context.UserProfiles.FindAsync(userId);
+    if (user == null) return NotFound("User profile not found.");
+
+    var today = DateTime.UtcNow.Date;
+    var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
+
+    if (trial == null)
+        return NotFound("No active trial found for today.");
+
+    bool isCorrect = string.Equals(trial.CorrectAnswer.Trim(), dto.Answer?.Trim(), StringComparison.OrdinalIgnoreCase);
+
+    if (!isCorrect)
+    {
+        return BadRequest(new { success = false, message = "Incorrect answer." });
+    }
+
+    // Calculate base reward points
+    int finalReward = trial.RewardPoints;
+
+    // Check if user's faction matches the current underdog faction for the +20% bonus
+    var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
+    var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
+
+    string underdog = blueCount < redCount ? "Blue" : redCount < blueCount ? "Red" : "";
+    if (user.Faction.ToString() == underdog)
+    {
+        finalReward = (int)(finalReward * 1.20); // +20% Underdog Multiplier!
+    }
+
+    // Add final calculated points to user profile ledger once
+    user.QuestPoints += finalReward;
+    user.UpdatedAt = DateTime.UtcNow;
+    await _context.SaveChangesAsync();
+
+    return Ok(new { success = true, rewardPoints = finalReward, message = $"Correct! +{finalReward} QP added to your ledger." });
+}
+
+[HttpPost("recruit")]
+public async Task<IActionResult> SubmitRecruitment([FromBody] RecruitmentDto dto)
+{
+    if (string.IsNullOrWhiteSpace(dto.Handle))
+        return BadRequest(new { success = false, message = "Handle cannot be empty." });
+
+    var cleanHandle = dto.Handle.Trim();
+    
+    // Check if handle already exists to avoid spam
+    bool exists = await _context.RecruitmentSubmissions.AnyAsync(r => r.Handle.ToLower() == cleanHandle.ToLower());
+    if (exists)
+    {
+        return Ok(new { success = true, message = "Handle already logged for video casting!" });
+    }
+
+    var submission = new RecruitmentSubmission
+    {
+        Handle = cleanHandle
+    };
+
+    _context.RecruitmentSubmissions.Add(submission);
+    await _context.SaveChangesAsync();
+
+    return Ok(new { success = true, message = "Transmission received! You're in the casting queue." });
+}
+
+[HttpGet("sponsors")]
+public async Task<ActionResult<IEnumerable<Sponsor>>> GetSponsors()
+{
+    var sponsors = await _context.Sponsors.OrderBy(s => s.DisplayOrder).ToListAsync();
+    return Ok(sponsors);
+}
+
+[HttpPost("sponsors")]
+[Authorize(Policy = "AdminOnly")]
+public async Task<ActionResult<Sponsor>> CreateSponsor([FromBody] Sponsor sponsor)
+{
+    if (string.IsNullOrWhiteSpace(sponsor.Name) || string.IsNullOrWhiteSpace(sponsor.WebsiteUrl))
+        return BadRequest(new { success = false, message = "Name and Website URL are required." });
+
+    _context.Sponsors.Add(sponsor);
+    await _context.SaveChangesAsync();
+    return Ok(sponsor);
+}
+
+[HttpDelete("sponsors/{id}")]
+[Authorize(Policy = "AdminOnly")]
+public async Task<IActionResult> DeleteSponsor(int id)
+{
+    var sponsor = await _context.Sponsors.FindAsync(id);
+    if (sponsor == null) return NotFound();
+
+    _context.Sponsors.Remove(sponsor);
+    await _context.SaveChangesAsync();
+    return Ok(new { success = true, message = "Sponsor removed." });
+}
+}

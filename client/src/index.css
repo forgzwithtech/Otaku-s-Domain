@@ -1,0 +1,242 @@
+@import "tailwindcss";
+@import url('https://fonts.googleapis.com/css2?family=Anton&family=Manrope:wght@400;500;700;800&family=JetBrains+Mono:wght@500;700&display=swap');
+
+:root {
+  --ink: #0A0A0F;
+  --paper: #EDEAE2;
+}
+
+/* Blue Guild (default) */
+:root, [data-guild='blue'] {
+  --guild-primary: #2E8FFF;
+  --guild-secondary: #7FE7FF;
+  --guild-glow: rgba(46, 143, 255, 0.55);
+}
+
+/* Red Guild */
+[data-guild='red'] {
+  --guild-primary: #FF3B3B;
+  --guild-secondary: #FF9A3B;
+  --guild-glow: rgba(255, 59, 59, 0.55);
+}
+
+body {
+  background: var(--ink);
+  color: var(--paper);
+  font-family: 'Manrope', sans-serif;
+}
+
+.font-display {
+  font-family: 'Anton', sans-serif;
+  letter-spacing: 0.02em;
+}
+
+.font-mono-tag {
+  font-family: 'JetBrains Mono', monospace;
+  letter-spacing: 0.08em;
+}
+
+/* Base glass surface — kept subtle, the manga details do the talking */
+.glass-panel {
+  background: rgba(255, 255, 255, 0.04);
+  backdrop-filter: blur(20px) saturate(140%);
+  -webkit-backdrop-filter: blur(20px) saturate(140%);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  transition: border-color 0.4s ease;
+}
+
+/* Manga panel: angled corner cut instead of uniform rounded rect */
+.manga-panel {
+  clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 0 100%);
+  border: 2px solid var(--guild-primary);
+  box-shadow: 0 0 0 1px rgba(255,255,255,0.06), 0 20px 60px -20px var(--guild-glow);
+  position: relative;
+}
+
+/* Halftone dot shading — pure CSS, no image asset needed */
+.halftone {
+  background-image: radial-gradient(circle, var(--guild-primary) 1px, transparent 1.4px);
+  background-size: 10px 10px;
+  opacity: 0.18;
+  mix-blend-mode: screen;
+}
+
+/* Speed-line burst behind hero type */
+.speed-burst {
+  background: repeating-conic-gradient(
+    from 0deg,
+    var(--guild-primary) 0deg 1.2deg,
+    transparent 1.2deg 9deg
+  );
+  opacity: 0.14;
+  mask-image: radial-gradient(circle, black 0%, transparent 70%);
+}
+
+/* Comic-outline hard shadow on headline text */
+.comic-text {
+  text-shadow:
+    3px 3px 0 var(--guild-primary),
+    -1px -1px 0 rgba(0,0,0,0.4);
+}
+
+/* Corner chapter-stamp badge */
+.stamp {
+  font-family: 'JetBrains Mono', monospace;
+  border: 2px solid var(--guild-primary);
+  transform: rotate(-4deg);
+}
+
+/* Manga panel — outer is the "ink border", inner holds real content.
+   Fixes the clip-path + border rendering artifact from before. */
+.manga-panel {
+  position: relative;
+  background: var(--guild-primary);
+  padding: 2px;
+  box-shadow: 0 20px 60px -20px var(--guild-glow);
+  clip-path: polygon(0 0, calc(100% - 28px) 0, 100% 28px, 100% 100%, 0 100%);
+}
+.manga-panel-inner {
+  clip-path: polygon(0 0, calc(100% - 26px) 0, 100% 26px, 100% 100%, 0 100%);
+  background: rgba(10, 10, 15, 0.92);
+  height: 100%;
+  width: 100%;
+}
+
+/* News ticker */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.animate-marquee {
+  animation: marquee 22s linear infinite;
+}
+
+/* ============================================================
+   MANGA FX — append this to your existing global stylesheet
+   (the one that already defines .glass-panel, .manga-panel,
+   .font-display, .font-mono-tag, .halftone, .speed-burst, etc.)
+   Nothing here renames or removes your existing classes.
+   ============================================================ */
+
+@keyframes stampSlam {
+  0%   { transform: scale(2.4) rotate(28deg); opacity: 0; }
+  55%  { transform: scale(0.88) rotate(-9deg); opacity: 1; }
+  75%  { transform: scale(1.05) rotate(-4deg); }
+  100% { transform: scale(1) rotate(-6deg); opacity: 1; }
+}
+
+@keyframes inkShake {
+  0%, 100% { transform: translateX(0) rotate(0deg); }
+  20% { transform: translateX(-3px) rotate(-1.5deg); }
+  40% { transform: translateX(3px) rotate(1.5deg); }
+  60% { transform: translateX(-2px) rotate(-0.5deg); }
+  80% { transform: translateX(2px) rotate(0.5deg); }
+}
+
+@keyframes burstIn {
+  0%   { opacity: 0; transform: scale(0.4) rotate(-6deg); }
+  50%  { opacity: 0.55; }
+  100% { opacity: 0.22; transform: scale(1) rotate(0deg); }
+}
+
+@keyframes haloDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 120px 90px; }
+}
+
+@keyframes revealUp {
+  0%   { opacity: 0; transform: translateY(18px); }
+  100% { opacity: 1; transform: translateY(0); }
+}
+
+/* ---- ink border + jagged torn-corner panel ---- */
+.ink-frame {
+  border: 3px solid #0a0a0f;
+  position: relative;
+  box-shadow: 6px 6px 0 rgba(0,0,0,0.85);
+}
+.ink-frame::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  border: 1px solid rgba(255,255,255,0.06);
+}
+
+.jagged-panel {
+  clip-path: polygon(0 0, 100% 0, 100% 88%, 94% 100%, 0 100%);
+}
+.jagged-panel-sm {
+  clip-path: polygon(0 0, 100% 0, 100% 100%, 8% 100%, 0 92%);
+}
+
+/* halftone dot field that slowly drifts, like cheap print registration */
+.halftone-drift {
+  background-image: radial-gradient(rgba(255,255,255,0.55) 1px, transparent 1.4px);
+  background-size: 14px 14px;
+  animation: haloDrift 6s linear infinite alternate;
+  opacity: 0.14;
+}
+
+/* speed lines bursting from behind a headline */
+.speed-burst-fx {
+  background: repeating-conic-gradient(from 0deg, rgba(255,255,255,0.16) 0deg 2deg, transparent 2deg 10deg);
+  animation: burstIn 0.9s cubic-bezier(.2,1.4,.4,1) both;
+}
+
+/* stamp badge that slams into place on mount */
+.stamp-slam {
+  animation: stampSlam 0.6s cubic-bezier(.25,1.6,.4,1) both;
+  transform-origin: center;
+}
+
+/* comic misregistration text — cheap-print double exposure look */
+.print-misreg {
+  text-shadow:
+    2px 0 0 rgba(255, 59, 59, 0.5),
+    -2px 0 0 rgba(46, 143, 255, 0.5),
+    0 4px 0 rgba(0,0,0,0.9);
+}
+
+/* sticker / comic-pop button: hard offset shadow that collapses on press */
+.comic-pop {
+  box-shadow: 4px 4px 0 #000;
+  border: 2px solid #000;
+  transition: transform 0.12s ease, box-shadow 0.12s ease;
+}
+.comic-pop:hover {
+  transform: translate(-2px, -2px);
+  box-shadow: 6px 6px 0 #000;
+}
+.comic-pop:active {
+  transform: translate(2px, 2px);
+  box-shadow: 1px 1px 0 #000;
+}
+
+/* hand-drawn marker underline for nav links */
+.marker-underline {
+  position: relative;
+}
+.marker-underline::after {
+  content: '';
+  position: absolute;
+  left: 2%;
+  right: 98%;
+  bottom: -4px;
+  height: 3px;
+  background: var(--guild-secondary);
+  transform: skewX(-12deg);
+  transition: right 0.22s cubic-bezier(.3,1,.4,1);
+}
+.marker-underline:hover::after {
+  right: 2%;
+}
+
+/* VS toggle shake-on-click helper */
+.ink-shake {
+  animation: inkShake 0.4s ease;
+}
+
+.reveal-up {
+  animation: revealUp 0.55s ease both;
+}

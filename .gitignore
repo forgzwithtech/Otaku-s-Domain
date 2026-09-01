@@ -1,0 +1,14 @@
+# .NET Build artifacts
+bin/
+obj/
+*.dll
+*.exe
+*.pdb
+appsettings.Development.json
+
+# Node / Frontend
+node_modules/
+dist/
+.env
+.env.local
+.DS_Store
