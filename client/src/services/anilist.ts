@@ -1,3 +1,5 @@
+// client/src/services/anilist.ts
+
 export interface VaultMedia {
   id: number;
   title: string;
@@ -68,6 +70,22 @@ interface AniListResponse {
   media: VaultMedia[];
 }
 
+// In-Memory Fast Cache (10-minute TTL)
+const cache = new Map<string, { timestamp: number; data: any }>();
+const CACHE_TTL = 10 * 60 * 1000;
+
+function getCached<T>(key: string): T | null {
+  const item = cache.get(key);
+  if (item && Date.now() - item.timestamp < CACHE_TTL) {
+    return item.data as T;
+  }
+  return null;
+}
+
+function setCached(key: string, data: any) {
+  cache.set(key, { timestamp: Date.now(), data });
+}
+
 const VAULT_MEDIA_QUERY = `
 query GetVaultMedia($page: Int, $perPage: Int, $type: MediaType, $search: String, $sort: [MediaSort], $isAdult: Boolean) {
   Page(page: $page, perPage: $perPage) {
@@ -86,7 +104,6 @@ query GetVaultMedia($page: Int, $perPage: Int, $type: MediaType, $search: String
       format
       status
       coverImage {
-        extraLarge
         large
       }
       bannerImage
@@ -117,6 +134,7 @@ query GetMediaDetails($id: Int) {
     seasonYear
     coverImage {
       extraLarge
+      large
     }
     bannerImage
     genres
@@ -131,7 +149,7 @@ query GetMediaDetails($id: Int) {
         name
       }
     }
-    characters(sort: [ROLE, FAVOURITES_DESC], perPage: 24) {
+    characters(sort: [ROLE, FAVOURITES_DESC], perPage: 50) {
       edges {
         role
         node {
@@ -189,12 +207,16 @@ export async function fetchVaultMedia(options: {
 }): Promise<AniListResponse> {
   const {
     page = 1,
-    perPage = 20,
+    perPage = 24,
     type = "ANIME",
     search,
     isAdult = false,
     sort = ["POPULARITY_DESC"]
   } = options;
+
+  const cacheKey = `vault_media_${type}_${page}_${perPage}_${search || ''}_${(sort || []).join('_')}`;
+  const cached = getCached<AniListResponse>(cacheKey);
+  if (cached) return cached;
 
   const variables: Record<string, any> = {
     page,
@@ -214,14 +236,10 @@ export async function fetchVaultMedia(options: {
       "Content-Type": "application/json",
       "Accept": "application/json",
     },
-    body: JSON.stringify({
-      query: VAULT_MEDIA_QUERY,
-      variables
-    })
+    body: JSON.stringify({ query: VAULT_MEDIA_QUERY, variables })
   });
 
   const json = await response.json();
-
   if (!json.data?.Page) {
     throw new Error("Failed to fetch data from AniList");
   }
@@ -233,7 +251,7 @@ export async function fetchVaultMedia(options: {
     type: item.format ? `${item.format} // ${item.status || "UNKNOWN"}` : "VAULT ARCHIVE",
     format: item.format || "N/A",
     status: item.status === "RELEASING" ? "HOT" : "CATALOG",
-    image: item.coverImage?.extraLarge || item.coverImage?.large || "https://via.placeholder.com/600x900/111/fff?text=NO+IMAGE",
+    image: item.coverImage?.large || item.coverImage?.extraLarge || "https://via.placeholder.com/600x900/111/fff?text=NO+IMAGE",
     bannerImage: item.bannerImage,
     genres: item.genres || [],
     description: item.description?.replace(/<[^>]*>?/gm, '') || "Classified database entry.",
@@ -241,13 +259,16 @@ export async function fetchVaultMedia(options: {
     isAdult: item.isAdult || false
   }));
 
-  return {
-    pageInfo: json.data.Page.pageInfo,
-    media
-  };
+  const result = { pageInfo: json.data.Page.pageInfo, media };
+  setCached(cacheKey, result);
+  return result;
 }
 
 export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
+  const cacheKey = `media_detail_${id}`;
+  const cached = getCached<DetailedMedia>(cacheKey);
+  if (cached) return cached;
+
   const response = await fetch("https://graphql.anilist.co", {
     method: "POST",
     headers: {
@@ -261,9 +282,10 @@ export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
   });
 
   const json = await response.json();
-  const item = json.data.Media;
+  const item = json.data?.Media;
+  if (!item) throw new Error("Media detail not found");
 
-  return {
+  const result: DetailedMedia = {
     id: item.id,
     title: item.title.english || item.title.romaji,
     romajiTitle: item.title.romaji,
@@ -275,7 +297,7 @@ export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
     chapters: item.chapters,
     duration: item.duration,
     seasonYear: item.seasonYear,
-    image: item.coverImage.extraLarge,
+    image: item.coverImage?.extraLarge || item.coverImage?.large,
     bannerImage: item.bannerImage,
     genres: item.genres || [],
     description: item.description?.replace(/<[^>]*>?/gm, '') || "Classified vault archive entry.",
@@ -306,4 +328,7 @@ export async function fetchMediaDetails(id: number): Promise<DetailedMedia> {
       relationType: edge.relationType
     })) || []
   };
+
+  setCached(cacheKey, result);
+  return result;
 }
