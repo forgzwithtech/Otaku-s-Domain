@@ -1,3 +1,5 @@
+// client/src/services/mangaDexEngine.ts
+
 export interface MangaDexChapter {
   id: string;
   chapterNumber: string;
@@ -23,7 +25,11 @@ export interface InVaultMangaItem {
   isMangaDexDirect: boolean;
 }
 
-const BASE_URL = "https://api.mangadex.org";
+// Routes through Vercel rewrite proxy in production to bypass MangaDex CORS/Cloudflare blocks
+const BASE_URL = import.meta.env.PROD 
+  ? "/mangadex-proxy" 
+  : "https://api.mangadex.org";
+
 const COVER_BASE = "https://uploads.mangadex.org/covers";
 
 // 1. Fetch Real Chapters from MangaDex
@@ -41,6 +47,7 @@ export async function getMangaDexData(
   for (const q of queries) {
     try {
       const searchRes = await fetch(`${BASE_URL}/manga?title=${encodeURIComponent(q)}&limit=1&order[relevance]=desc`);
+      if (!searchRes.ok) continue;
       const searchData = await searchRes.json();
       if (searchData.data?.[0]?.id) {
         mangaId = searchData.data[0].id;
@@ -55,6 +62,8 @@ export async function getMangaDexData(
 
   try {
     const feedRes = await fetch(`${BASE_URL}/manga/${mangaId}/feed?translatedLanguage[]=en&order[chapter]=asc&limit=500`);
+    if (!feedRes.ok) return { chapters: [], mangaDexId: mangaId, isReadable: false };
+
     const feedData = await feedRes.json();
 
     if (!feedData.data || feedData.data.length === 0) {
@@ -94,6 +103,7 @@ export async function getMangaDexData(
 export async function getMangaDexPages(chapterId: string): Promise<string[]> {
   try {
     const res = await fetch(`${BASE_URL}/at-home/server/${chapterId}`);
+    if (!res.ok) return [];
     const data = await res.json();
     const baseUrl = data.baseUrl;
     const hash = data.chapter.hash;
@@ -150,6 +160,7 @@ export async function fetchMangaDexBrowseList(
 
   try {
     const res = await fetch(`${BASE_URL}/manga?${params.toString()}`);
+    if (!res.ok) return { items: [], hasNextPage: false };
     const data = await res.json();
 
     if (!data.data) return { items: [], hasNextPage: false };
