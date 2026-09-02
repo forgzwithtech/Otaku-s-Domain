@@ -2,7 +2,6 @@ import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { fetchStoreCatalog } from "../services/storeApi";
 import StoreNavbar from "../components/store/StoreNavbar";
-import coverImage from "../assets/cover.png";
 import merchVideo from "../assets/merchvid.mp4";
 
 const F_DISPLAY = "'Anton', sans-serif";
