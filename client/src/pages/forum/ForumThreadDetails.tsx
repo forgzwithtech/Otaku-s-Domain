@@ -10,6 +10,12 @@ import {
 } from "../../services/forumApi";
 import GenderGatekeeperModal from "../../components/forum/GenderGatekeeperModal";
 import OperativeProfileModal from "../../components/forum/OperativeProfileModal";
+import { 
+  IconChat, 
+  IconShurikenRepost, 
+  IconKatanaHeart, 
+  IconKunaiLink 
+} from "../../components/forum/MangaIcons";
 import { supabase } from "../../lib/supabase";
 import { needsGenderDeclaration } from "../../utils/genter";
 
@@ -211,10 +217,11 @@ export default function ForumThreadDetail() {
 
       {qpToast && (
         <div
-          className="fixed top-20 right-6 z-50 bg-black text-yellow-400 border-4 border-yellow-400 p-4 font-black uppercase text-sm shadow-[8px_8px_0px_#000] animate-bounce ink-box-thread"
+          className="fixed top-20 right-6 z-50 bg-black text-yellow-400 border-4 border-yellow-400 p-4 font-black uppercase text-sm shadow-[8px_8px_0px_#000] animate-bounce ink-box-thread flex items-center gap-2"
           style={{ fontFamily: F_MONO }}
         >
-          🏆 {qpToast}
+          <IconShurikenRepost className="w-5 h-5 text-yellow-400 animate-spin" />
+          <span>{qpToast}</span>
         </div>
       )}
 
@@ -222,10 +229,10 @@ export default function ForumThreadDetail() {
         <div className="mb-6 flex justify-between items-center">
           <Link
             to="/forum"
-            className="bg-black text-white px-5 py-2.5 uppercase font-black text-xs jagged-tag-thread border-2 border-black hover:bg-[var(--guild-primary)] hover:text-black transition-colors"
+            className="bg-black text-white px-5 py-2.5 uppercase font-black text-xs jagged-tag-thread border-2 border-black hover:bg-[var(--guild-primary)] hover:text-black transition-colors flex items-center gap-1.5"
             style={{ fontFamily: F_MONO }}
           >
-            ← Return to Forum Frequencies
+            ← Return to Forum
           </Link>
           <span className="text-xs font-bold uppercase text-zinc-600 font-mono">
             Channel: {thread.category?.icon} {thread.category?.name}
@@ -245,12 +252,12 @@ export default function ForumThreadDetail() {
             </span>
             {thread.isPinned && (
               <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black uppercase jagged-tag-thread font-mono">
-                📌 PINNED
+                PINNED
               </span>
             )}
             {thread.isLocked && (
               <span className="bg-zinc-800 text-white px-2 py-0.5 text-[10px] font-black uppercase jagged-tag-thread font-mono">
-                🔒 LOCKED
+                SEALED
               </span>
             )}
           </div>
@@ -276,7 +283,7 @@ export default function ForumThreadDetail() {
                   </span>
                 </div>
                 <div className="flex items-center gap-1.5 mt-0.5">
-                  <span className="bg-yellow-400 text-black px-1 py-0.2 text-[9px] font-black uppercase border border-black jagged-tag-thread font-mono">
+                  <span className="bg-yellow-400 text-black px-1.5 py-0.2 text-[9px] font-black uppercase border border-black jagged-tag-thread font-mono">
                     {threadAuthor?.gender || threadAuthor?.Gender}
                   </span>
                   <span className={`text-[9px] font-black uppercase px-1.5 py-0.2 border border-black jagged-tag-thread text-white font-mono ${factionBg(threadAuthor?.faction)}`}>
@@ -334,47 +341,61 @@ export default function ForumThreadDetail() {
             </div>
           )}
 
-          {/* Attached Quoted Thread Card */}
+          {/* 1. CLICKABLE QUOTE CARD LINKING DIRECTLY BACK TO ORIGINAL TRANSMISSION */}
           {thread.repostOfThread && (
-            <div className="relative z-10 border-2 border-black p-4 bg-[#e8e4d8] mb-6 font-mono text-xs shadow-[4px_4px_0px_#000]">
-              <span className="font-bold text-[10px] text-zinc-500 uppercase block mb-1">
-                Quoted Transmission from @{thread.repostOfThread.author?.username}:
-              </span>
-              <h4 className="font-black text-base uppercase mb-1" style={{ fontFamily: F_DISPLAY }}>
+            <Link
+              to={`/forum/${thread.repostOfThread.id}`}
+              className="block group/quote relative z-10 border-2 border-black p-4 bg-[#e8e4d8] hover:bg-[#dedacb] transition-all mb-6 font-mono text-xs shadow-[4px_4px_0px_#000] cursor-pointer"
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="font-bold text-[10px] text-zinc-500 uppercase flex items-center gap-1 group-hover/quote:text-black">
+                  <IconKunaiLink className="w-3 h-3 text-red-600" />
+                  Original Transmission from @{thread.repostOfThread.author?.username}
+                </span>
+                <span className="text-[10px] font-black text-red-600 group-hover/quote:translate-x-1 transition-transform">
+                  View Source ↗
+                </span>
+              </div>
+              <h4 className="font-black text-base uppercase mb-1 group-hover/quote:text-red-600 transition-colors" style={{ fontFamily: F_DISPLAY }}>
                 {thread.repostOfThread.title}
               </h4>
               <p className="text-zinc-700 whitespace-pre-line line-clamp-3">
                 {thread.repostOfThread.content}
               </p>
-            </div>
+            </Link>
           )}
 
-          {/* Action Bar */}
+          {/* 2. MANGA ACTION BAR WITH VECTORS INSTEAD OF EMOJIS */}
           <div className="relative z-10 flex flex-wrap items-center justify-between pt-4 border-t-2 border-black/10 border-dashed text-xs font-mono font-bold text-zinc-600 gap-4">
             <div className="flex items-center gap-6">
-              {/* Like Button */}
+              {/* Like / Endorse */}
               <button
                 onClick={handleLikeThread}
                 className={`flex items-center gap-1.5 transition-colors cursor-pointer text-sm ${
                   thread.hasLiked || thread.HasLiked ? "text-red-600 font-black" : "hover:text-red-600"
                 }`}
               >
-                {thread.hasLiked || thread.HasLiked ? "❤️" : "🤍"} {thread.likesCount || thread.LikesCount || 0}
+                <IconKatanaHeart className="w-4 h-4" filled={Boolean(thread.hasLiked || thread.HasLiked)} />
+                <span>{thread.likesCount || thread.LikesCount || 0}</span>
               </button>
 
-              {/* Repost Button */}
+              {/* Repost / Retransmit */}
               <button
                 onClick={handleRepostThread}
                 className="flex items-center gap-1.5 hover:text-green-600 transition-colors cursor-pointer text-sm"
               >
-                🔁 {thread.repostCount || thread.RepostCount || 0}
+                <IconShurikenRepost className="w-4 h-4 text-zinc-700 hover:rotate-180 transition-transform duration-300" />
+                <span>{thread.repostCount || thread.RepostCount || 0}</span>
               </button>
 
-              <span className="text-sm">💬 {threadComments.length}</span>
+              <span className="flex items-center gap-1.5 text-sm">
+                <IconChat className="w-4 h-4 text-zinc-700" />
+                <span>{threadComments.length}</span>
+              </span>
             </div>
 
             <div className="flex items-center gap-4">
-              <span>👁 {thread.viewCount || thread.ViewCount || 0} Views</span>
+              <span>{thread.viewCount || thread.ViewCount || 0} Views</span>
             </div>
           </div>
         </div>
@@ -397,7 +418,6 @@ export default function ForumThreadDetail() {
                   <div key={commentId} className="ink-box-thread bg-white p-5 shadow-[6px_6px_0px_#000] relative overflow-hidden font-mono">
                     <div className={`absolute left-0 top-0 bottom-0 w-1.5 ${factionBg(author?.faction)}`} />
                     
-                    {/* Comment Header */}
                     <div className="flex justify-between items-start mb-2 pl-2">
                       <div
                         onClick={() => setViewingUsername(author?.username || author?.Username)}
@@ -432,7 +452,6 @@ export default function ForumThreadDetail() {
                       {comment.content || comment.Content}
                     </p>
 
-                    {/* Like & Reply Action Footer */}
                     <div className="flex items-center gap-4 text-xs font-bold border-t border-black/10 pt-2 pl-2">
                       <button
                         onClick={() => handleLikeComment(commentId)}
@@ -440,7 +459,8 @@ export default function ForumThreadDetail() {
                           comment.hasLiked || comment.HasLiked ? "text-red-600" : "hover:text-red-600 text-zinc-600"
                         }`}
                       >
-                        {comment.hasLiked || comment.HasLiked ? "❤️" : "🤍"} {comment.likesCount || comment.LikesCount || 0}
+                        <IconKatanaHeart className="w-3.5 h-3.5" filled={Boolean(comment.hasLiked || comment.HasLiked)} />
+                        <span>{comment.likesCount || comment.LikesCount || 0}</span>
                       </button>
 
                       <button
@@ -450,13 +470,14 @@ export default function ForumThreadDetail() {
                           setCommentText(`@${targetUser} `);
                           window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
                         }}
-                        className="text-zinc-600 hover:text-blue-600 transition-colors cursor-pointer flex items-center gap-1"
+                        className="text-zinc-600 hover:text-blue-600 transition-colors cursor-pointer flex items-center gap-1.5"
                       >
-                        💬 Reply
+                        <IconChat className="w-3.5 h-3.5" />
+                        <span>Reply</span>
                       </button>
                     </div>
 
-                    {/* Recursive / Nested Child Replies */}
+                    {/* Recursive Child Replies */}
                     {replies.length > 0 && (
                       <div className="mt-4 pl-4 sm:pl-6 border-l-2 border-black/30 space-y-3 pt-2">
                         {replies.map((reply: any) => {
@@ -494,11 +515,12 @@ export default function ForumThreadDetail() {
                               <div className="flex items-center gap-3 text-[11px] font-bold">
                                 <button
                                   onClick={() => handleLikeComment(repId)}
-                                  className={`cursor-pointer ${
+                                  className={`flex items-center gap-1 cursor-pointer ${
                                     reply.hasLiked || reply.HasLiked ? "text-red-600" : "text-zinc-600 hover:text-red-600"
                                   }`}
                                 >
-                                  {reply.hasLiked || reply.HasLiked ? "❤️" : "🤍"} {reply.likesCount || reply.LikesCount || 0}
+                                  <IconKatanaHeart className="w-3 h-3" filled={Boolean(reply.hasLiked || reply.HasLiked)} />
+                                  <span>{reply.likesCount || reply.LikesCount || 0}</span>
                                 </button>
                                 <button
                                   onClick={() => {
@@ -507,9 +529,10 @@ export default function ForumThreadDetail() {
                                     setCommentText(`@${targetUser} `);
                                     window.scrollTo({ top: document.body.scrollHeight, behavior: "smooth" });
                                   }}
-                                  className="text-zinc-600 hover:text-blue-600 transition-colors cursor-pointer"
+                                  className="text-zinc-600 hover:text-blue-600 transition-colors cursor-pointer flex items-center gap-1"
                                 >
-                                  💬 Reply
+                                  <IconChat className="w-3 h-3" />
+                                  <span>Reply</span>
                                 </button>
                               </div>
                             </div>
@@ -540,7 +563,7 @@ export default function ForumThreadDetail() {
                     setReplyingToComment(null);
                     setCommentText("");
                   }}
-                  className="text-red-600 uppercase hover:underline"
+                  className="text-red-600 uppercase hover:underline cursor-pointer"
                 >
                   ✕ Cancel Reply
                 </button>
@@ -576,7 +599,7 @@ export default function ForumThreadDetail() {
           </form>
         ) : (
           <div className="ink-box-thread bg-zinc-900 text-white p-4 text-center font-bold text-xs uppercase font-mono">
-            🔒 This transmission has been sealed by Interpool Command.
+            This transmission has been sealed by Interpool Command.
           </div>
         )}
       </div>

@@ -15,6 +15,14 @@ import { uploadMediaAsset } from "../services/storage";
 import GenderGatekeeperModal from "../components/forum/GenderGatekeeperModal";
 import ForumFloatingDock from "../components/forum/ForumFloatingDock";
 import OperativeProfileModal from "../components/forum/OperativeProfileModal";
+import { 
+  IconChat, 
+  IconShurikenRepost, 
+  IconScrollQuote, 
+  IconKatanaHeart, 
+  IconKunaiLink, 
+  IconRadarAlert 
+} from "../components/forum/MangaIcons";
 import { supabase } from "../lib/supabase";
 import { needsGenderDeclaration } from "../utils/genter";
 
@@ -34,10 +42,6 @@ function useForumMangaAssets() {
       .halftone-forum-dark {
         background-image: radial-gradient(rgba(0,0,0,0.6) 1.5px, transparent 1.5px);
         background-size: 6px 6px;
-      }
-      .halftone-forum-light {
-        background-image: radial-gradient(rgba(255,255,255,0.4) 1.5px, transparent 1.5px);
-        background-size: 8px 8px;
       }
       .vertical-jp-forum {
         writing-mode: vertical-rl;
@@ -82,13 +86,13 @@ export default function Forum() {
   const [showGatekeeper, setShowGatekeeper] = useState(false);
   const [showNewThreadModal, setShowNewThreadModal] = useState(false);
 
-  // X Social Interactions
+  // Social State
   const [quotingThread, setQuotingThread] = useState<any | null>(null);
   const [notifications, setNotifications] = useState<any[]>([]);
   const [showNotifications, setShowNotifications] = useState(false);
   const [viewingUsername, setViewingUsername] = useState<string | null>(null);
 
-  // AniList Media Linkage
+  // Media Linkage
   const [aniSearchQuery, setAniSearchQuery] = useState("");
   const [aniSearchType, setAniSearchType] = useState<"ANIME" | "MANGA">("ANIME");
   const [aniSearchResults, setAniSearchResults] = useState<VaultMedia[]>([]);
@@ -175,7 +179,6 @@ export default function Forum() {
     setShowNewThreadModal(true);
   };
 
-  // In-Feed Like Action
   const handleLike = async (e: React.MouseEvent, threadId: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -191,7 +194,6 @@ export default function Forum() {
     await toggleThreadLike(threadId);
   };
 
-  // In-Feed Instant Repost Action
   const handleRepost = async (e: React.MouseEvent, threadId: number) => {
     e.preventDefault();
     e.stopPropagation();
@@ -203,7 +205,6 @@ export default function Forum() {
     }
   };
 
-  // Open Quote Modal
   const handleQuoteClick = (e: React.MouseEvent, targetThread: any) => {
     e.preventDefault();
     e.stopPropagation();
@@ -345,7 +346,8 @@ export default function Forum() {
                 onClick={handleOpenNotifications}
                 className="relative bg-white border-2 border-black px-4 py-3.5 ink-box-forum font-mono font-bold text-xs uppercase hover:bg-yellow-400 transition-colors flex items-center gap-2 cursor-pointer shadow-[4px_4px_0px_#000]"
               >
-                <span>🔔 Alerts</span>
+                <IconRadarAlert className="w-4 h-4 text-black" />
+                <span>Radar</span>
                 {unreadCount > 0 && (
                   <span className="bg-red-600 text-white text-[10px] px-1.5 py-0.2 rounded-full font-black">
                     {unreadCount}
@@ -364,19 +366,22 @@ export default function Forum() {
           </div>
         </div>
 
-        {/* NOTIFICATIONS DRAWER */}
+        {/* NOTIFICATIONS RADAR FEED */}
         {showNotifications && (
           <div className="ink-box-forum bg-white p-4 mb-6 shadow-[8px_8px_0px_#000] max-h-72 overflow-y-auto font-mono text-xs">
             <div className="flex justify-between items-center border-b-2 border-black pb-2 mb-3">
-              <span className="font-black uppercase">Operative Radar Feed</span>
-              <button onClick={() => setShowNotifications(false)} className="font-bold text-red-600">✕ Close</button>
+              <span className="font-black uppercase flex items-center gap-1.5">
+                <IconRadarAlert className="w-4 h-4 text-red-600" />
+                Operative Radar Intel
+              </span>
+              <button onClick={() => setShowNotifications(false)} className="font-bold text-red-600 cursor-pointer">✕ Close</button>
             </div>
             {notifications.length > 0 ? (
               <div className="space-y-2">
                 {notifications.map((n: any) => (
                   <div key={n.id} className="p-2.5 border border-black/20 bg-[#e8e4d8] flex items-center justify-between">
                     <div>
-                      <span className="font-black uppercase mr-2">[{n.type}]</span>
+                      <span className="font-black uppercase mr-2 text-red-600">[{n.type}]</span>
                       <span>{n.message}</span>
                     </div>
                     <span className="text-[10px] text-zinc-500">{new Date(n.createdAt).toLocaleTimeString()}</span>
@@ -384,7 +389,7 @@ export default function Forum() {
                 ))}
               </div>
             ) : (
-              <div className="text-zinc-500 py-4 text-center">No alerts logged in your frequency.</div>
+              <div className="text-zinc-500 py-4 text-center">No radar alerts logged in your frequency.</div>
             )}
           </div>
         )}
@@ -395,9 +400,9 @@ export default function Forum() {
             <div className="flex items-center gap-2 flex-wrap">
               <span className="text-xs font-bold uppercase text-zinc-500 mr-1 shrink-0" style={{ fontFamily: F_MONO }}>Filter:</span>
               {[
-                { key: "", label: "All" },
-                { key: "ANIME", label: "📺 Anime" },
-                { key: "MANGA", label: "📖 Manga" },
+                { key: "", label: "All Frequencies" },
+                { key: "ANIME", label: "Anime" },
+                { key: "MANGA", label: "Manga" },
               ].map((opt) => (
                 <button
                   key={opt.key}
@@ -463,7 +468,7 @@ export default function Forum() {
               >
                 <div className={`absolute left-0 top-0 bottom-0 w-2 ${factionBg(t.author?.faction)}`} />
 
-                {/* Author Info & Badges (Clicking user opens dossier) */}
+                {/* Author Info */}
                 <div className="flex items-center justify-between pl-2">
                   <div
                     onClick={() => setViewingUsername(t.author?.username)}
@@ -519,37 +524,49 @@ export default function Forum() {
                   </div>
                 )}
 
-                {/* Attached Quoted Thread */}
+                {/* 1. CLICKABLE QUOTE CARD LINKING BACK TO ORIGINAL */}
                 {t.repostOfThread && (
-                  <div className="ml-2 border-2 border-black p-3 bg-[#e8e4d8] font-mono text-xs shadow-[3px_3px_0px_#000]">
-                    <span className="font-bold text-[10px] text-zinc-500 uppercase block mb-1">
-                      Quoting @{t.repostOfThread.author?.username}:
-                    </span>
-                    <h4 className="font-black text-sm uppercase" style={{ fontFamily: F_DISPLAY }}>
+                  <Link
+                    to={`/forum/${t.repostOfThread.id}`}
+                    className="block group/quote ml-2 border-2 border-black p-3.5 bg-[#e8e4d8] hover:bg-[#dedacb] transition-all font-mono text-xs shadow-[3px_3px_0px_#000] cursor-pointer"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="font-bold text-[10px] text-zinc-600 uppercase flex items-center gap-1 group-hover/quote:text-black">
+                        <IconKunaiLink className="w-3 h-3 text-red-600" />
+                        Quoting @{t.repostOfThread.author?.username}
+                      </span>
+                      <span className="text-[9px] font-black text-red-600 group-hover/quote:translate-x-1 transition-transform">
+                        View Source ↗
+                      </span>
+                    </div>
+                    <h4 className="font-black text-sm uppercase group-hover/quote:text-red-600 transition-colors" style={{ fontFamily: F_DISPLAY }}>
                       {t.repostOfThread.title}
                     </h4>
                     <p className="text-zinc-700 line-clamp-2 mt-1">{t.repostOfThread.content}</p>
-                  </div>
+                  </Link>
                 )}
 
-                {/* Social Interaction Buttons */}
+                {/* 2. SOCIAL BUTTONS WITH VECTOR MANGA ICONS */}
                 <div className="flex items-center gap-6 pt-3 border-t border-black/10 font-mono text-xs font-bold pl-2">
                   <Link to={`/forum/${t.id}`} className="flex items-center gap-1.5 hover:text-blue-600 transition-colors">
-                    💬 {t.replyCount || 0}
+                    <IconChat className="w-4 h-4 text-zinc-700" />
+                    <span>{t.replyCount || 0}</span>
                   </Link>
 
                   <button
                     onClick={(e) => handleRepost(e, t.id)}
                     className="flex items-center gap-1.5 hover:text-green-600 transition-colors cursor-pointer"
                   >
-                    🔁 {t.repostCount || 0}
+                    <IconShurikenRepost className="w-4 h-4 text-zinc-700 hover:rotate-180 transition-transform duration-300" />
+                    <span>{t.repostCount || 0}</span>
                   </button>
 
                   <button
                     onClick={(e) => handleQuoteClick(e, t)}
                     className="flex items-center gap-1.5 hover:text-purple-600 transition-colors cursor-pointer"
                   >
-                    🖋️ Quote
+                    <IconScrollQuote className="w-4 h-4 text-zinc-700" />
+                    <span>Quote</span>
                   </button>
 
                   <button
@@ -558,7 +575,8 @@ export default function Forum() {
                       t.hasLiked ? "text-red-600 font-black" : "hover:text-red-600"
                     }`}
                   >
-                    {t.hasLiked ? "❤️" : "🤍"} {t.likesCount || 0}
+                    <IconKatanaHeart className="w-4 h-4" filled={Boolean(t.hasLiked)} />
+                    <span>{t.likesCount || 0}</span>
                   </button>
                 </div>
               </div>
@@ -573,7 +591,7 @@ export default function Forum() {
 
       <ForumFloatingDock onNewTransmission={handleCreateThreadClick} />
 
-      {/* OPERATIVE PROFILE MODAL */}
+      {/* Operative Profile Modal */}
       {viewingUsername && (
         <OperativeProfileModal
           username={viewingUsername}
@@ -581,7 +599,7 @@ export default function Forum() {
         />
       )}
 
-      {/* GENDER GATEKEEPER MODAL */}
+      {/* Gender Gatekeeper Modal */}
       {showGatekeeper && (
         <GenderGatekeeperModal
           onSuccess={(gender) => {
@@ -593,7 +611,7 @@ export default function Forum() {
         />
       )}
 
-      {/* BROADCAST / QUOTE MODAL */}
+      {/* Broadcast / Quote Modal */}
       {showNewThreadModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
           <div className="ink-box-forum bg-[#e8e4d8] p-5 sm:p-6 md:p-8 max-w-2xl w-full shadow-[14px_14px_0px_#000] relative max-h-[92vh] sm:max-h-[90vh] overflow-y-auto rounded-t-2xl sm:rounded-none">
@@ -618,7 +636,7 @@ export default function Forum() {
                 </select>
               </div>
 
-              {/* AniList Search for Normal Threads */}
+              {/* AniList Search for Non-Quote Threads */}
               {!quotingThread && (
                 <div className="border-2 border-black p-3 bg-white">
                   <span className="text-xs font-black uppercase block mb-1 text-zinc-700">Link Anime or Manga Dossier (AniList)</span>
