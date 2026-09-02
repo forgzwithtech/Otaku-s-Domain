@@ -54,12 +54,23 @@ export async function verifyPaymentReference(reference: string) {
   return await res.json();
 }
 
-// Gatekeeper QR Code Scanner
-export async function scanGatekeeperTicket(ticketId: string) {
+export async function scanGatekeeperTicket(params: {
+  ticketId: string;
+  eventId: number;
+  requiredStageId?: number;
+}) {
+  const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(`${API_BASE}/events/gatekeeper-scan`, {
     method: "POST",
-    headers: await authHeaders(),
-    body: JSON.stringify({ ticketId }),
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${session?.access_token || ""}`,
+    },
+    body: JSON.stringify({
+      ticketId: params.ticketId,
+      eventId: params.eventId,
+      requiredStageId: params.requiredStageId || null,
+    }),
   });
   return await res.json();
 }

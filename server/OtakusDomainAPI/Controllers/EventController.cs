@@ -250,9 +250,13 @@ public async Task<IActionResult> GetAllEvents()
     }
 
     // =========================================================================
-    // 4. GATEKEEPER QR SCANNER (MOD / ADMIN VERIFICATION)
+    // 4. CONTEXT-AWARE GATEKEEPER QR SCANNER (EVENT & TIER BOUND)
     // =========================================================================
-    public record ScanTicketDto(Guid TicketId);
+    public record ScanTicketDto(
+        Guid TicketId,
+        int EventId,
+        int? RequiredStageId = null
+    );
 
     [HttpPost("gatekeeper-scan")]
     [Authorize]
@@ -263,7 +267,7 @@ public async Task<IActionResult> GetAllEvents()
 
         var officer = await _context.UserProfiles.FindAsync(userId.Value);
         if (officer == null || (officer.Role != UserRole.Admin && officer.Role != UserRole.Moderator))
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Officer clearance required for check-in." });
+            return StatusCode(StatusCodes.Status403Forbidden, new { valid = false, message = "Restricted: Officer clearance required." });
 
         var ticket = await _context.EventTicketPasses
             .Include(p => p.Event)
@@ -272,30 +276,59 @@ public async Task<IActionResult> GetAllEvents()
             .FirstOrDefaultAsync(p => p.Id == dto.TicketId);
 
         if (ticket == null)
-            return NotFound(new { valid = false, message = "INVALID TICKET // RECORD NOT FOUND" });
+            return NotFound(new { valid = false, message = "INVALID PASS // RECORD NOT FOUND" });
 
-        if (!ticket.IsPaid)
-            return BadRequest(new { valid = false, message = "UNPAID TICKET // TRANSACTION NOT COMPLETED" });
-
-        if (ticket.IsPresaleVoucher)
+        // 1. Check Event Matching
+        if (ticket.EventId != dto.EventId)
         {
             return BadRequest(new
             {
                 valid = false,
-                message = "PRESALE VOUCHER ONLY: Operative must upgrade to a full admission ticket before gate entry."
+                message = $"WRONG EVENT: This ticket is for '{ticket.Event?.Title}', not the current active gate!"
             });
         }
 
+        // 2. Check Payment Status
+        if (!ticket.IsPaid)
+            return BadRequest(new { valid = false, message = "UNPAID TICKET // TRANSACTION PENDING OR FAILED" });
+
+        // 3. Reject Un-Upgraded Presale Vouchers
+        if (ticket.IsPresaleVoucher && !ticket.HasUpgradedToFullTicket)
+        {
+            return BadRequest(new
+            {
+                valid = false,
+                message = "PRESALE VOUCHER ONLY: Operative must upgrade to an admission ticket before entry!"
+            });
+        }
+
+        // 4. Check Tier Enforcement (If Gatekeeper selected a specific tier gate)
+        if (dto.RequiredStageId.HasValue && dto.RequiredStageId.Value > 0)
+        {
+            if (ticket.TicketStageId != dto.RequiredStageId.Value)
+            {
+                return BadRequest(new
+                {
+                    valid = false,
+                    message = $"TIER MISMATCH: Pass is for '{ticket.TicketStage?.StageName}'. Access to this gate is restricted!"
+                });
+            }
+        }
+
+        // 5. Check if already used
         if (ticket.Status == TicketStatus.CheckedIn)
         {
             return BadRequest(new
             {
                 valid = false,
                 alreadyCheckedIn = true,
-                message = $"ALREADY USED: Checked in on {ticket.CheckedInAt:g} by {ticket.CheckedInByOfficer}"
+                guest = ticket.GuestName,
+                stage = ticket.TicketStage?.StageName,
+                message = $"ALREADY USED: Checked in at {ticket.CheckedInAt:g} by {ticket.CheckedInByOfficer}"
             });
         }
 
+        // Process Check-in
         ticket.Status = TicketStatus.CheckedIn;
         ticket.CheckedInAt = DateTime.UtcNow;
         ticket.CheckedInByOfficer = officer.DisplayName ?? officer.Username;
@@ -306,10 +339,12 @@ public async Task<IActionResult> GetAllEvents()
         {
             valid = true,
             guest = ticket.GuestName,
+            email = ticket.GuestEmail,
             faction = ticket.User?.Faction.ToString() ?? "None",
             stage = ticket.TicketStage?.StageName,
             eventTitle = ticket.Event?.Title,
-            message = "ACCESS GRANTED // WELCOME OPERATIVE"
+            checkedInAt = ticket.CheckedInAt,
+            message = "ACCESS GRANTED // CLEARANCE VERIFIED"
         });
     }
 }
