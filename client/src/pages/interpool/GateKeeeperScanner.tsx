@@ -1,4 +1,3 @@
-// client/src/pages/interpool/GateKeeeperScanner.tsx
 import { useState, useEffect, useRef } from "react";
 import { Link } from "react-router-dom";
 import { fetchAllEvents, scanGatekeeperTicket } from "../../services/eventsApi";
@@ -16,7 +15,7 @@ export default function GatekeeperScanner() {
   const [manualCode, setManualCode] = useState("");
   const [loading, setLoading] = useState(false);
 
-  // Verification & Lockout State
+  // Verification & Screen Freeze State
   const [scanResult, setScanResult] = useState<any | null>(null);
   const isLockedRef = useRef(false);
 
@@ -90,7 +89,7 @@ export default function GatekeeperScanner() {
     };
   }, []);
 
-  // Frame Scanning Loop with Strict Lockout Guard
+  // Frame Scanning Loop with Freeze Gate
   const startScanningFrames = () => {
     const hasBarcodeDetector = "BarcodeDetector" in window;
     let detector: any = null;
@@ -104,7 +103,6 @@ export default function GatekeeperScanner() {
     }
 
     const tick = async () => {
-      // If locked after a scan, skip reading frames completely until officer taps 'Continue'
       if (isLockedRef.current) {
         animationFrameRef.current = requestAnimationFrame(tick);
         return;
@@ -156,7 +154,6 @@ export default function GatekeeperScanner() {
       setScanResult(res);
       setManualCode("");
 
-      // Trigger haptic vibration on mobile devices if available
       if (navigator.vibrate) {
         navigator.vibrate(res.valid ? [100, 50, 100] : [300, 100, 300]);
       }
@@ -174,7 +171,7 @@ export default function GatekeeperScanner() {
 
   return (
     <div className="min-h-screen bg-[#070709] text-white p-4 sm:p-8 font-mono flex flex-col items-center justify-between relative overflow-hidden">
-      {/* FULL-SCREEN IMMERSIVE GLOW POPUP */}
+      {/* FULL-SCREEN IMMERSIVE FEEDBACK OVERLAY */}
       {scanResult && (
         <div
           className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in transition-all ${
@@ -305,7 +302,7 @@ export default function GatekeeperScanner() {
         </div>
       </div>
 
-      {/* Scanner & Manual Overrides */}
+      {/* Scanner & Manual Input */}
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-8 mb-8 items-start">
         {/* Viewfinder Lens */}
         <div className="md:col-span-6 flex flex-col items-center gap-4">

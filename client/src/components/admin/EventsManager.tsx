@@ -1,4 +1,3 @@
-// client/src/components/admin/EventManager.tsx
 import { useState, useEffect, type FormEvent } from "react";
 import { 
   fetchAllEvents, 
@@ -19,7 +18,7 @@ export default function EventManager() {
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<"overview" | "stats" | "presale" | "stages" | "roster" | "media">("overview");
 
-  // Roster & Stats Data
+  // Telemetry & Roster
   const [roster, setRoster] = useState<any[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
   const [eventStats, setEventStats] = useState<any | null>(null);
@@ -168,13 +167,13 @@ export default function EventManager() {
 
   const handleDeleteCurrentEvent = async () => {
     if (!selectedEventId) return;
-    if (confirm(`Strict Level 2 Admin Clearance: Delete "${eventForm.title}" and wipe all associated passes and records?`)) {
+    if (confirm(`Strict Level 2 Admin Clearance: Delete "${eventForm.title}" and erase all associated passes and records?`)) {
       try {
         await deleteAdminEvent(selectedEventId);
         setSelectedEventId(null);
         loadEvents();
       } catch (err: any) {
-        alert(err.message || "Failed to delete event. Make sure you are signed in as an Admin.");
+        alert(err.message || "Failed to delete event. Admin role required.");
       }
     }
   };
@@ -277,7 +276,7 @@ export default function EventManager() {
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-        {/* Left: Active Event Switcher Sidebar */}
+        {/* Left: Active Event Switcher */}
         <div className="lg:col-span-4 flex flex-col gap-3" style={{ fontFamily: F_MONO }}>
           <span className="text-xs uppercase font-bold text-zinc-500">Live & Scheduled Events ({events.length})</span>
           <div className="flex flex-col gap-2 max-h-[600px] overflow-y-auto pr-1">
@@ -308,14 +307,13 @@ export default function EventManager() {
 
         {/* Right: Tabbed Configuration */}
         <div className="lg:col-span-8 bg-[#e8e4d8] border-2 border-black p-5 shadow-[4px_4px_0px_#000]" style={{ fontFamily: F_MONO }}>
-          {/* Tab Navigation */}
           <div className="flex flex-wrap gap-2 mb-6 border-b-2 border-black pb-3">
             {[
               { id: "overview", label: "1. Overview & Details" },
               { id: "stats", label: "📊 2. Live Event Telemetry" },
               { id: "presale", label: "3. Presale Voucher Rules" },
               { id: "stages", label: "4. Admission Tiers" },
-              { id: "roster", label: "5. Guest Roster & Scanner" },
+              { id: "roster", label: "5. Guest Roster" },
               { id: "media", label: "6. Social Hype Media" },
             ].map((t) => (
               <button
@@ -435,9 +433,9 @@ export default function EventManager() {
                 <h4 className="font-bold text-sm uppercase">Live Attendance & Revenue Telemetry</h4>
                 <button
                   onClick={() => selectedEventId && loadStatsData(selectedEventId)}
-                  className="text-xs underline text-blue-600"
+                  className="text-xs underline text-blue-600 cursor-pointer"
                 >
-                  Refresh Feed
+                  Refresh Telemetry
                 </button>
               </div>
 
@@ -447,20 +445,26 @@ export default function EventManager() {
                 <div className="flex flex-col gap-4">
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
                     <div className="bg-white border-2 border-black p-3">
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Passes Issued</span>
-                      <span className="text-2xl font-black">{eventStats.totalIssued}</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Gate Passes Sold</span>
+                      <span className="text-2xl font-black">{eventStats.totalAdmissionsSold}</span>
+                      <span className="text-[9px] text-zinc-400 block font-mono">Real attendees</span>
                     </div>
                     <div className="bg-white border-2 border-black p-3">
-                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Gate Check-Ins</span>
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Door Check-Ins</span>
                       <span className="text-2xl font-black text-green-600">{eventStats.checkedInCount}</span>
+                      <span className="text-[9px] text-zinc-400 block font-mono">Cleared at door</span>
                     </div>
                     <div className="bg-white border-2 border-black p-3">
                       <span className="text-[10px] text-zinc-500 uppercase font-bold block">Presale Vouchers</span>
-                      <span className="text-2xl font-black text-yellow-600">{eventStats.presaleVouchersCount}</span>
+                      <span className="text-2xl font-black text-yellow-600">{eventStats.totalPresalesIssued}</span>
+                      <span className="text-[9px] text-zinc-500 block font-mono">
+                        {eventStats.pendingPresalesCount} pending upgrade
+                      </span>
                     </div>
                     <div className="bg-white border-2 border-black p-3">
                       <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Revenue</span>
                       <span className="text-xl font-black text-zinc-900">₦{Number(eventStats.totalRevenue).toLocaleString()}</span>
+                      <span className="text-[9px] text-zinc-400 block font-mono">Passes + Vouchers</span>
                     </div>
                   </div>
 

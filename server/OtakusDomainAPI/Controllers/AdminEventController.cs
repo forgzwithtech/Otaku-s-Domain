@@ -36,7 +36,7 @@ public class AdminEventsController : ControllerBase
         return user != null && user.Role == UserRole.Admin;
     }
 
-    // Live Event Telemetry & Ticket Breakdown Stats
+    // 1. Live Event Telemetry & Ticket Breakdown Stats (Segregating Admissions & Vouchers)
     [HttpGet("{id}/stats")]
     public async Task<IActionResult> GetEventStats(int id)
     {
@@ -49,36 +49,50 @@ public class AdminEventsController : ControllerBase
 
         if (evt == null) return NotFound("Event not found.");
 
-        var paidTickets = evt.IssuedTickets.Where(t => t.IsPaid).ToList();
-        var totalIssued = paidTickets.Count;
-        var checkedInCount = paidTickets.Count(t => t.Status == TicketStatus.CheckedIn);
-        var presaleVouchersCount = paidTickets.Count(t => t.IsPresaleVoucher);
-        var totalRevenue = paidTickets.Sum(t => t.PurchaseAmount);
+        var paidRecords = evt.IssuedTickets.Where(t => t.IsPaid).ToList();
 
-        var tierBreakdown = evt.TicketStages.Select(s => new
-        {
-            s.Id,
-            s.StageName,
-            StageType = s.StageType.ToString(),
-            s.BasePrice,
-            s.TotalCapacity,
-            Sold = paidTickets.Count(t => t.TicketStageId == s.Id),
-            CheckedIn = paidTickets.Count(t => t.TicketStageId == s.Id && t.Status == TicketStatus.CheckedIn)
-        }).ToList();
+        // Separate physical admission passes from presale vouchers
+        var admissionPasses = paidRecords.Where(t => !t.IsPresaleVoucher).ToList();
+        var presaleVouchers = paidRecords.Where(t => t.IsPresaleVoucher).ToList();
+
+        var totalAdmissionsSold = admissionPasses.Count;
+        var checkedInCount = admissionPasses.Count(t => t.Status == TicketStatus.CheckedIn);
+        
+        var totalPresalesIssued = presaleVouchers.Count;
+        var upgradedPresalesCount = presaleVouchers.Count(t => t.HasUpgradedToFullTicket);
+        var pendingPresalesCount = presaleVouchers.Count(t => !t.HasUpgradedToFullTicket);
+
+        var totalRevenue = paidRecords.Sum(t => t.PurchaseAmount);
+
+        // Admission Tiers Breakdown (Excludes presale voucher stage)
+        var tierBreakdown = evt.TicketStages
+            .Where(s => s.StageType != TicketStageType.PresaleVoucher)
+            .Select(s => new
+            {
+                s.Id,
+                s.StageName,
+                StageType = s.StageType.ToString(),
+                s.BasePrice,
+                s.TotalCapacity,
+                Sold = admissionPasses.Count(t => t.TicketStageId == s.Id),
+                CheckedIn = admissionPasses.Count(t => t.TicketStageId == s.Id && t.Status == TicketStatus.CheckedIn)
+            }).ToList();
 
         return Ok(new
         {
             eventId = evt.Id,
             title = evt.Title,
-            totalIssued,
+            totalAdmissionsSold,
             checkedInCount,
-            presaleVouchersCount,
+            totalPresalesIssued,
+            upgradedPresalesCount,
+            pendingPresalesCount,
             totalRevenue,
             tierBreakdown
         });
     }
 
-    // Get Live Attendee Roster
+    // 2. Get Live Attendee Roster
     [HttpGet("{id}/roster")]
     public async Task<IActionResult> GetEventRoster(int id)
     {
@@ -109,6 +123,7 @@ public class AdminEventsController : ControllerBase
         return Ok(passes);
     }
 
+    // 3. Save / Update Event Parameters
     public record UpsertEventDto(
         int Id,
         string Title,
@@ -174,12 +189,12 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Event saved." });
     }
 
-    // Delete Event from Database — STRICT ADMIN ONLY
+    // 4. Delete Event from Database — STRICT ADMIN ONLY
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteEvent(int id)
     {
         if (!await IsStrictAdminAsync())
-            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only Level 2 Administrators can decommission events." });
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Access Denied: Level 2 Admin clearance required to delete events." });
 
         var evt = await _context.GuildEvents
             .Include(e => e.TicketStages)
@@ -193,6 +208,7 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Event deleted permanently." });
     }
 
+    // 5. Save or Update Ticket Stage
     public record UpsertStageDto(
         int? Id,
         int EventId,
@@ -259,6 +275,7 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Stage configuration saved." });
     }
 
+    // 6. Delete Ticket Stage
     [HttpDelete("stages/{id}")]
     public async Task<IActionResult> DeleteStage(int id)
     {
