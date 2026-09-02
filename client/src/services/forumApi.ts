@@ -1,3 +1,4 @@
+// client/src/services/forumApi.ts
 import { supabase } from "../lib/supabase";
 
 const API_BASE = import.meta.env.VITE_API_BASE_URL || "https://otaku-s-domain.onrender.com/api";
@@ -8,6 +9,15 @@ async function authHeaders() {
     "Content-Type": "application/json",
     Authorization: `Bearer ${session?.access_token || ""}`,
   };
+}
+
+export async function setOperativeGender(gender: string) {
+  const res = await fetch(`${API_BASE}/forum/set-gender`, {
+    method: "POST",
+    headers: await authHeaders(),
+    body: JSON.stringify({ gender }),
+  });
+  return await res.json();
 }
 
 export async function fetchForumCategories() {
@@ -22,20 +32,15 @@ export async function fetchForumThreads(params: { categoryId?: number; mediaType
     search: params.search || "",
     page: (params.page || 1).toString(),
   });
-  const res = await fetch(`${API_BASE}/forum/threads?${q.toString()}`);
+  const res = await fetch(`${API_BASE}/forum/threads?${q.toString()}`, {
+    headers: await authHeaders(),
+  });
   return await res.json();
 }
 
 export async function fetchThreadDetails(id: number) {
-  const res = await fetch(`${API_BASE}/forum/threads/${id}`);
-  return await res.json();
-}
-
-export async function setOperativeGender(gender: string) {
-  const res = await fetch(`${API_BASE}/forum/set-gender`, {
-    method: "POST",
+  const res = await fetch(`${API_BASE}/forum/threads/${id}`, {
     headers: await authHeaders(),
-    body: JSON.stringify({ gender }),
   });
   return await res.json();
 }
@@ -50,6 +55,8 @@ export async function createForumThread(payload: {
   mediaTitle?: string;
   mediaCoverUrl?: string;
   mediaScore?: number;
+  repostOfThreadId?: number;
+  isQuoteRepost?: boolean;
 }) {
   const res = await fetch(`${API_BASE}/forum/threads`, {
     method: "POST",
@@ -59,11 +66,55 @@ export async function createForumThread(payload: {
   return await res.json();
 }
 
-export async function postThreadComment(threadId: number, content: string) {
+export async function toggleThreadLike(threadId: number) {
+  const res = await fetch(`${API_BASE}/forum/threads/${threadId}/like`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function toggleRepost(threadId: number) {
+  const res = await fetch(`${API_BASE}/forum/threads/${threadId}/repost`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function postThreadComment(threadId: number, content: string, parentCommentId?: number) {
   const res = await fetch(`${API_BASE}/forum/threads/${threadId}/comments`, {
     method: "POST",
     headers: await authHeaders(),
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, parentCommentId }),
   });
+  return await res.json();
+}
+
+export async function toggleCommentLike(commentId: number) {
+  const res = await fetch(`${API_BASE}/forum/comments/${commentId}/like`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function fetchNotifications() {
+  const res = await fetch(`${API_BASE}/forum/notifications`, {
+    headers: await authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function markNotificationsAsRead() {
+  const res = await fetch(`${API_BASE}/forum/notifications/mark-read`, {
+    method: "POST",
+    headers: await authHeaders(),
+  });
+  return await res.json();
+}
+
+export async function fetchOperativeProfile(username: string) {
+  const res = await fetch(`${API_BASE}/forum/profile/${encodeURIComponent(username)}`);
   return await res.json();
 }

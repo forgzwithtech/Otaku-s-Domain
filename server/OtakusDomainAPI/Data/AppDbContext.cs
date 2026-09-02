@@ -28,6 +28,10 @@ public class AppDbContext : DbContext
     public DbSet<StoreProductVariant> StoreProductVariants => Set<StoreProductVariant>();
     public DbSet<StoreOrder> StoreOrders => Set<StoreOrder>();
     public DbSet<StoreOrderItem> StoreOrderItems => Set<StoreOrderItem>();
+  
+public DbSet<ForumThreadLike> ForumThreadLikes => Set<ForumThreadLike>();
+public DbSet<ForumCommentLike> ForumCommentLikes => Set<ForumCommentLike>();
+public DbSet<UserNotification> UserNotifications => Set<UserNotification>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
