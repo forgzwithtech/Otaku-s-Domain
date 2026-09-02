@@ -37,16 +37,7 @@ const HERO_LOOKBOOK = [
     subtext: " Streetwear • Built for Otaku",
     type: "video",
     src: merchVideo,
-  },
-  {
-    theme: "Otaku's Domain Core",
-    themeKanji: "領域展開",
-    headline: "Otaku's Domain",
-    headlineKanji: "特級呪物",
-    subtext: "Represent the community",
-    type: "image",
-    src: coverImage,
-  },
+  }
 ];
 
 export default function Store() {
@@ -82,7 +73,7 @@ export default function Store() {
   useEffect(() => {
     const timer = setInterval(() => {
       setSlideIdx((prev) => (prev + 1) % HERO_LOOKBOOK.length);
-    }, 12000);
+    }, 1100000);
     return () => clearInterval(timer);
   }, []);
 
