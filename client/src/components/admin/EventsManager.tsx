@@ -1,5 +1,14 @@
+// client/src/components/admin/EventManager.tsx
 import { useState, useEffect, type FormEvent } from "react";
-import { fetchAllEvents, fetchEventRoster, saveAdminEvent, deleteAdminEvent, saveAdminStage, deleteAdminStage } from "../../services/eventsApi";
+import { 
+  fetchAllEvents, 
+  fetchEventRoster, 
+  fetchEventStats,
+  saveAdminEvent, 
+  deleteAdminEvent, 
+  saveAdminStage, 
+  deleteAdminStage 
+} from "../../services/eventsApi";
 import { uploadMediaAsset } from "../../services/storage";
 
 const F_DISPLAY = "'Anton', sans-serif";
@@ -8,11 +17,13 @@ const F_MONO = "'Space Mono', monospace";
 export default function EventManager() {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [activeTab, setActiveTab] = useState<"overview" | "presale" | "stages" | "roster" | "media">("overview");
+  const [activeTab, setActiveTab] = useState<"overview" | "stats" | "presale" | "stages" | "roster" | "media">("overview");
 
-  // Roster & Telemetry Data
+  // Roster & Stats Data
   const [roster, setRoster] = useState<any[]>([]);
   const [loadingRoster, setLoadingRoster] = useState(false);
+  const [eventStats, setEventStats] = useState<any | null>(null);
+  const [loadingStats, setLoadingStats] = useState(false);
 
   // Forms
   const [eventForm, setEventForm] = useState({
@@ -115,6 +126,18 @@ export default function EventManager() {
     }
   };
 
+  const loadStatsData = async (eventId: number) => {
+    setLoadingStats(true);
+    try {
+      const data = await fetchEventStats(eventId);
+      setEventStats(data);
+    } catch (err) {
+      console.error(err);
+    } finally {
+      setLoadingStats(false);
+    }
+  };
+
   const loadRosterData = async (eventId: number) => {
     setLoadingRoster(true);
     try {
@@ -126,8 +149,9 @@ export default function EventManager() {
   };
 
   useEffect(() => {
-    if (selectedEventId && activeTab === "roster") {
-      loadRosterData(selectedEventId);
+    if (selectedEventId) {
+      if (activeTab === "roster") loadRosterData(selectedEventId);
+      if (activeTab === "stats") loadStatsData(selectedEventId);
     }
   }, [selectedEventId, activeTab]);
 
@@ -144,19 +168,20 @@ export default function EventManager() {
 
   const handleDeleteCurrentEvent = async () => {
     if (!selectedEventId) return;
-    if (confirm(`Are you sure you want to permanently delete "${eventForm.title}" and all its tiers/tickets?`)) {
-      await deleteAdminEvent(selectedEventId);
-      setSelectedEventId(null);
-      loadEvents();
+    if (confirm(`Strict Level 2 Admin Clearance: Delete "${eventForm.title}" and wipe all associated passes and records?`)) {
+      try {
+        await deleteAdminEvent(selectedEventId);
+        setSelectedEventId(null);
+        loadEvents();
+      } catch (err: any) {
+        alert(err.message || "Failed to delete event. Make sure you are signed in as an Admin.");
+      }
     }
   };
 
   const handleSavePresale = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedEventId) {
-      alert("Please select or create an event first.");
-      return;
-    }
+    if (!selectedEventId) return;
     await saveAdminStage({
       id: presaleForm.id > 0 ? presaleForm.id : undefined,
       eventId: selectedEventId,
@@ -176,10 +201,7 @@ export default function EventManager() {
 
   const handleSaveStage = async (e: FormEvent) => {
     e.preventDefault();
-    if (!selectedEventId) {
-      alert("Please select or create an event first.");
-      return;
-    }
+    if (!selectedEventId) return;
     await saveAdminStage({
       id: stageForm.id > 0 ? stageForm.id : undefined,
       eventId: selectedEventId,
@@ -290,10 +312,11 @@ export default function EventManager() {
           <div className="flex flex-wrap gap-2 mb-6 border-b-2 border-black pb-3">
             {[
               { id: "overview", label: "1. Overview & Details" },
-              { id: "presale", label: "2. Presale Voucher Rules" },
-              { id: "stages", label: "3. Admission Tiers" },
-              { id: "roster", label: "4. Guest Roster & Scanner" },
-              { id: "media", label: "5. Social Hype Media" },
+              { id: "stats", label: "📊 2. Live Event Telemetry" },
+              { id: "presale", label: "3. Presale Voucher Rules" },
+              { id: "stages", label: "4. Admission Tiers" },
+              { id: "roster", label: "5. Guest Roster & Scanner" },
+              { id: "media", label: "6. Social Hype Media" },
             ].map((t) => (
               <button
                 key={t.id}
@@ -335,7 +358,7 @@ export default function EventManager() {
               <div className="grid grid-cols-2 gap-2">
                 <input
                   type="text"
-                  placeholder="URL Slug (e.g. watch-party-1)"
+                  placeholder="URL Slug"
                   value={eventForm.slug}
                   onChange={(e) => setEventForm({ ...eventForm, slug: e.target.value })}
                   className="p-2 border border-black text-xs bg-white"
@@ -405,7 +428,73 @@ export default function EventManager() {
             </form>
           )}
 
-          {/* TAB 2: PRESALE VOUCHER */}
+          {/* TAB 2: LIVE TELEMETRY & BREAKDOWN STATS */}
+          {activeTab === "stats" && (
+            <div className="flex flex-col gap-4">
+              <div className="flex justify-between items-center border-b border-black pb-2">
+                <h4 className="font-bold text-sm uppercase">Live Attendance & Revenue Telemetry</h4>
+                <button
+                  onClick={() => selectedEventId && loadStatsData(selectedEventId)}
+                  className="text-xs underline text-blue-600"
+                >
+                  Refresh Feed
+                </button>
+              </div>
+
+              {loadingStats ? (
+                <div className="text-center py-8 text-xs font-bold text-zinc-500 uppercase">⚡ Gathering event metrics...</div>
+              ) : eventStats ? (
+                <div className="flex flex-col gap-4">
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center">
+                    <div className="bg-white border-2 border-black p-3">
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Passes Issued</span>
+                      <span className="text-2xl font-black">{eventStats.totalIssued}</span>
+                    </div>
+                    <div className="bg-white border-2 border-black p-3">
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Gate Check-Ins</span>
+                      <span className="text-2xl font-black text-green-600">{eventStats.checkedInCount}</span>
+                    </div>
+                    <div className="bg-white border-2 border-black p-3">
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Presale Vouchers</span>
+                      <span className="text-2xl font-black text-yellow-600">{eventStats.presaleVouchersCount}</span>
+                    </div>
+                    <div className="bg-white border-2 border-black p-3">
+                      <span className="text-[10px] text-zinc-500 uppercase font-bold block">Total Revenue</span>
+                      <span className="text-xl font-black text-zinc-900">₦{Number(eventStats.totalRevenue).toLocaleString()}</span>
+                    </div>
+                  </div>
+
+                  <div className="border-2 border-black bg-white p-4">
+                    <span className="text-xs font-black uppercase block mb-3">Admission Tiers Breakdown</span>
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b-2 border-black text-[10px] uppercase text-zinc-500">
+                        <tr>
+                          <th className="pb-1">Tier Name</th>
+                          <th className="pb-1">Base Price</th>
+                          <th className="pb-1">Sold / Cap</th>
+                          <th className="pb-1">Gate Check-ins</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-zinc-200">
+                        {eventStats.tierBreakdown?.map((tier: any) => (
+                          <tr key={tier.id}>
+                            <td className="py-2 font-bold">{tier.stageName}</td>
+                            <td className="py-2">₦{Number(tier.basePrice).toLocaleString()}</td>
+                            <td className="py-2">{tier.sold} / {tier.totalCapacity}</td>
+                            <td className="py-2 text-green-600 font-bold">{tier.checkedIn}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              ) : (
+                <div className="text-center py-8 text-xs font-bold text-zinc-500">No live telemetry recorded for this event.</div>
+              )}
+            </div>
+          )}
+
+          {/* TAB 3: PRESALE VOUCHER */}
           {activeTab === "presale" && (
             <form onSubmit={handleSavePresale} className="flex flex-col gap-4">
               <div className="border border-black p-3 bg-white">
@@ -467,7 +556,7 @@ export default function EventManager() {
             </form>
           )}
 
-          {/* TAB 3: ADMISSION TIERS */}
+          {/* TAB 4: ADMISSION TIERS */}
           {activeTab === "stages" && (
             <div className="flex flex-col gap-4">
               <form onSubmit={handleSaveStage} className="bg-white p-4 border border-black flex flex-col gap-3">
@@ -571,7 +660,6 @@ export default function EventManager() {
                 </div>
               </form>
 
-              {/* Active Tiers List */}
               <div className="flex flex-col gap-2 max-h-64 overflow-y-auto">
                 {currentEvent?.admissionStages?.map((s: any) => (
                   <div key={s.id} className="bg-white p-3 border border-black flex justify-between items-center text-xs shadow-[2px_2px_0px_#000]">
@@ -615,7 +703,7 @@ export default function EventManager() {
             </div>
           )}
 
-          {/* TAB 4: GUEST ROSTER & SCANNER LOGS */}
+          {/* TAB 5: GUEST ROSTER */}
           {activeTab === "roster" && (
             <div className="flex flex-col gap-3">
               <div className="flex justify-between items-center">
@@ -668,7 +756,7 @@ export default function EventManager() {
             </div>
           )}
 
-          {/* TAB 5: MEDIA & SOCIAL HYPE */}
+          {/* TAB 6: MEDIA & SOCIAL HYPE */}
           {activeTab === "media" && (
             <div className="flex flex-col gap-4">
               <div className="border border-black p-3 bg-white">
@@ -697,7 +785,6 @@ export default function EventManager() {
                 </div>
               </div>
 
-              {/* Social Hype Video Links */}
               <div className="border border-black p-3 bg-white">
                 <span className="text-[10px] font-bold uppercase block mb-1">Add Social Video Reel (YouTube / TikTok / IG)</span>
                 <div className="flex gap-2 mb-2">

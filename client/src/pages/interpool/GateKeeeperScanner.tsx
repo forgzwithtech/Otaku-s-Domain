@@ -9,21 +9,21 @@ const F_MONO = "'Space Mono', monospace";
 export default function GatekeeperScanner() {
   const [events, setEvents] = useState<any[]>([]);
   const [selectedEventId, setSelectedEventId] = useState<number | null>(null);
-  const [selectedStageId, setSelectedStageId] = useState<number | 0>(0);
+  const [selectedStageId, setSelectedStageId] = useState<number>(0);
 
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
   const [manualCode, setManualCode] = useState("");
-  const [scanResult, setScanResult] = useState<any | null>(null);
   const [loading, setLoading] = useState(false);
-  const [lastScannedCode, setLastScannedCode] = useState<string | null>(null);
+
+  // Verification & Lockout State
+  const [scanResult, setScanResult] = useState<any | null>(null);
+  const isLockedRef = useRef(false);
 
   const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const animationFrameRef = useRef<number | null>(null);
 
-  // 1. Load active events on mount
   useEffect(() => {
     async function load() {
       try {
@@ -41,7 +41,6 @@ export default function GatekeeperScanner() {
 
   const activeEvent = events.find((e) => e.id === selectedEventId);
 
-  // 2. Camera start/stop
   const startCamera = async () => {
     if (!selectedEventId) {
       alert("Please select the target event first.");
@@ -51,7 +50,7 @@ export default function GatekeeperScanner() {
     setCameraError(null);
     try {
       if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
-        throw new Error("Camera API not supported or insecure HTTP context.");
+        throw new Error("Camera API not supported or context is insecure.");
       }
 
       const stream = await navigator.mediaDevices.getUserMedia({
@@ -91,7 +90,7 @@ export default function GatekeeperScanner() {
     };
   }, []);
 
-  // 3. Real-time Frame Decoding Loop
+  // Frame Scanning Loop with Strict Lockout Guard
   const startScanningFrames = () => {
     const hasBarcodeDetector = "BarcodeDetector" in window;
     let detector: any = null;
@@ -100,28 +99,29 @@ export default function GatekeeperScanner() {
       try {
         detector = new (window as any).BarcodeDetector({ formats: ["qr_code", "code_128"] });
       } catch (e) {
-        console.warn("BarcodeDetector format initialization failed:", e);
+        console.warn(e);
       }
     }
 
     const tick = async () => {
-      if (!videoRef.current || videoRef.current.readyState < 2) {
+      // If locked after a scan, skip reading frames completely until officer taps 'Continue'
+      if (isLockedRef.current) {
         animationFrameRef.current = requestAnimationFrame(tick);
         return;
       }
 
-      if (detector) {
+      if (videoRef.current && videoRef.current.readyState >= 2 && detector) {
         try {
           const barcodes = await detector.detect(videoRef.current);
           if (barcodes && barcodes.length > 0) {
             const raw = barcodes[0].rawValue;
-            if (raw && raw !== lastScannedCode) {
-              setLastScannedCode(raw);
+            if (raw) {
+              isLockedRef.current = true; // Instantly lock further detection
               handleVerifyPass(raw);
             }
           }
         } catch {
-          // Frame drop safe
+          // Ignore dropped frames
         }
       }
 
@@ -131,11 +131,9 @@ export default function GatekeeperScanner() {
     animationFrameRef.current = requestAnimationFrame(tick);
   };
 
-  // 4. Context-bound ticket verification
   const handleVerifyPass = async (ticketPayload: string) => {
     if (!ticketPayload.trim() || !selectedEventId) return;
 
-    // Sanitize in case QR contains full URL or JSON
     let cleanTicketId = ticketPayload.trim();
     if (cleanTicketId.includes("pass=")) {
       cleanTicketId = cleanTicketId.split("pass=")[1].split("&")[0];
@@ -156,23 +154,85 @@ export default function GatekeeperScanner() {
       });
 
       setScanResult(res);
-      if (res.valid) {
-        setManualCode("");
+      setManualCode("");
+
+      // Trigger haptic vibration on mobile devices if available
+      if (navigator.vibrate) {
+        navigator.vibrate(res.valid ? [100, 50, 100] : [300, 100, 300]);
       }
     } catch (err: any) {
       setScanResult({ valid: false, message: err.message || "Network gatekeeper error." });
     } finally {
       setLoading(false);
-      // Allow re-scanning next person after 3.5s cooldown
-      setTimeout(() => {
-        setLastScannedCode(null);
-      }, 3500);
     }
   };
 
+  const handleDismissScan = () => {
+    setScanResult(null);
+    isLockedRef.current = false; // Release lock for next scan
+  };
+
   return (
-    <div className="min-h-screen bg-[#070709] text-white p-4 sm:p-8 font-mono flex flex-col items-center justify-between">
-      <canvas ref={canvasRef} className="hidden" />
+    <div className="min-h-screen bg-[#070709] text-white p-4 sm:p-8 font-mono flex flex-col items-center justify-between relative overflow-hidden">
+      {/* FULL-SCREEN IMMERSIVE GLOW POPUP */}
+      {scanResult && (
+        <div
+          className={`fixed inset-0 z-50 flex flex-col items-center justify-center p-6 text-center animate-fade-in transition-all ${
+            scanResult.valid
+              ? "bg-emerald-950/95 shadow-[inset_0_0_120px_rgba(16,185,129,0.8)] border-8 border-emerald-500"
+              : "bg-red-950/95 shadow-[inset_0_0_120px_rgba(239,68,68,0.8)] border-8 border-red-600"
+          }`}
+        >
+          <div className="max-w-xl w-full bg-black/90 p-8 border-4 border-white shadow-[12px_12px_0px_#000] flex flex-col items-center gap-4">
+            <span
+              className={`text-6xl sm:text-7xl block animate-bounce ${
+                scanResult.valid ? "text-emerald-400" : "text-red-500"
+              }`}
+            >
+              {scanResult.valid ? "✔" : "✕"}
+            </span>
+
+            <span
+              className={`px-4 py-1 text-xs font-black uppercase tracking-widest ${
+                scanResult.valid ? "bg-emerald-500 text-black" : "bg-red-600 text-white"
+              }`}
+            >
+              {scanResult.valid ? "ACCESS GRANTED" : "ACCESS REJECTED"}
+            </span>
+
+            <h2 className="text-3xl sm:text-5xl uppercase font-black tracking-tight" style={{ fontFamily: F_DISPLAY }}>
+              {scanResult.guest || scanResult.message}
+            </h2>
+
+            {scanResult.valid && (
+              <div className="w-full bg-zinc-900 border border-emerald-500/40 p-4 text-xs font-mono space-y-1.5 text-zinc-300 text-left">
+                <p>🎟 <strong>PASS TIER:</strong> <span className="text-white">{scanResult.stage}</span></p>
+                <p>🏟 <strong>EVENT:</strong> <span className="text-white">{scanResult.eventTitle}</span></p>
+                <p>🛡 <strong>FACTION:</strong> <span className="text-white">{scanResult.faction}</span></p>
+                <p>⏱ <strong>CHECKED IN AT:</strong> <span className="text-white">{new Date(scanResult.checkedInAt).toLocaleTimeString()}</span></p>
+              </div>
+            )}
+
+            {!scanResult.valid && (
+              <p className="text-sm font-bold text-red-300 bg-red-900/40 p-3 border border-red-500/50 w-full">
+                {scanResult.message}
+              </p>
+            )}
+
+            <button
+              onClick={handleDismissScan}
+              className={`w-full py-4 text-sm font-black uppercase tracking-widest transition-all cursor-pointer border-2 border-black shadow-[6px_6px_0px_#fff] hover:translate-y-1 hover:shadow-none ${
+                scanResult.valid
+                  ? "bg-emerald-500 hover:bg-emerald-400 text-black"
+                  : "bg-white hover:bg-zinc-200 text-black"
+              }`}
+              style={{ fontFamily: F_DISPLAY }}
+            >
+              ✓ Confirm & Proceed to Next Guest ➔
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Top Header */}
       <div className="w-full max-w-5xl flex justify-between items-center pb-6 border-b border-white/10">
@@ -193,7 +253,7 @@ export default function GatekeeperScanner() {
         </Link>
       </div>
 
-      {/* STEP 1: CONTEXT BINDING (Pick Event & Gate Tier) */}
+      {/* Context Binding: Select Event & Tier Gate */}
       <div className="w-full max-w-5xl my-6 bg-zinc-950 border-2 border-white/20 p-5 shadow-[6px_6px_0px_#000]">
         <div className="text-xs font-bold uppercase text-zinc-400 mb-3 flex items-center gap-2">
           <span className="bg-rose-600 text-white px-2 py-0.5 text-[10px]">STEP 1</span>
@@ -245,9 +305,9 @@ export default function GatekeeperScanner() {
         </div>
       </div>
 
-      {/* STEP 2: SCANNER & VERIFICATION */}
+      {/* Scanner & Manual Overrides */}
       <div className="w-full max-w-5xl grid grid-cols-1 md:grid-cols-12 gap-8 mb-8 items-start">
-        {/* Viewfinder Frame */}
+        {/* Viewfinder Lens */}
         <div className="md:col-span-6 flex flex-col items-center gap-4">
           <div className="relative w-full aspect-square max-w-[380px] bg-black border-4 border-black rounded-lg overflow-hidden flex items-center justify-center shadow-[10px_10px_0px_#000]">
             <video
@@ -260,9 +320,7 @@ export default function GatekeeperScanner() {
             {!cameraActive && (
               <div className="flex flex-col items-center p-6 text-center gap-3">
                 <span className="text-4xl">📷</span>
-                <span className="text-xs text-zinc-400 uppercase font-bold">
-                  Camera Lens Offline
-                </span>
+                <span className="text-xs text-zinc-400 uppercase font-bold">Camera Lens Offline</span>
                 <button
                   onClick={startCamera}
                   className="px-6 py-3 bg-white text-black font-black uppercase text-xs hover:bg-rose-500 hover:text-white transition-all cursor-pointer border-2 border-black shadow-[4px_4px_0px_#000]"
@@ -295,7 +353,7 @@ export default function GatekeeperScanner() {
           )}
         </div>
 
-        {/* Manual Input & Live Pass Telemetry */}
+        {/* Manual Code Input */}
         <div className="md:col-span-6 flex flex-col gap-5 bg-zinc-950 border-2 border-white/20 p-6 shadow-[8px_8px_0px_#000]">
           <div>
             <span className="text-xs font-bold uppercase text-zinc-300 block mb-1">
@@ -309,6 +367,7 @@ export default function GatekeeperScanner() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              isLockedRef.current = true;
               handleVerifyPass(manualCode);
             }}
             className="flex flex-col gap-3"
@@ -330,41 +389,6 @@ export default function GatekeeperScanner() {
               {loading ? "Authenticating Pass..." : "Verify Gate Entry ➔"}
             </button>
           </form>
-
-          {/* Validation Result Box */}
-          {scanResult && (
-            <div
-              className={`p-5 border-2 text-xs flex flex-col gap-2 ${
-                scanResult.valid
-                  ? "bg-emerald-950/80 border-emerald-500 text-emerald-200"
-                  : "bg-red-950/80 border-red-500 text-red-200"
-              }`}
-            >
-              <div className="flex items-center justify-between font-black uppercase text-sm border-b border-white/20 pb-2">
-                <span>{scanResult.valid ? "✔ CLEARANCE APPROVED" : "✕ ACCESS DENIED"}</span>
-                {scanResult.alreadyCheckedIn && (
-                  <span className="bg-red-600 text-white text-[9px] px-2 py-0.5">ALREADY USED</span>
-                )}
-              </div>
-
-              <p className="font-bold text-base text-white">{scanResult.guest || scanResult.message}</p>
-
-              {scanResult.valid && (
-                <div className="text-[11px] space-y-1 text-zinc-300 pt-2 border-t border-emerald-500/30">
-                  <p>🎟 Ticket Tier: <strong className="text-white">{scanResult.stage}</strong></p>
-                  <p>🏟 Target Event: <strong className="text-white">{scanResult.eventTitle}</strong></p>
-                  <p>🛡 Faction Alignment: <strong className="text-white">{scanResult.faction}</strong></p>
-                  <p>⏱ Timestamp: <strong>{new Date(scanResult.checkedInAt).toLocaleTimeString()}</strong></p>
-                </div>
-              )}
-
-              {!scanResult.valid && (
-                <div className="text-[11px] text-red-300 pt-1">
-                  Reason: <strong>{scanResult.message}</strong>
-                </div>
-              )}
-            </div>
-          )}
         </div>
       </div>
 

@@ -46,7 +46,7 @@ export async function initializeTicketPayment(payload: {
   return await res.json();
 }
 
-// 2. Verify Paystack Payment on Return
+// Verify Paystack Payment on Return
 export async function verifyPaymentReference(reference: string) {
   const res = await fetch(`${API_BASE}/payments/verify?reference=${encodeURIComponent(reference)}`, {
     headers: await authHeaders(),
@@ -54,18 +54,15 @@ export async function verifyPaymentReference(reference: string) {
   return await res.json();
 }
 
+// Gatekeeper Verification
 export async function scanGatekeeperTicket(params: {
   ticketId: string;
   eventId: number;
   requiredStageId?: number;
 }) {
-  const { data: { session } } = await supabase.auth.getSession();
   const res = await fetch(`${API_BASE}/events/gatekeeper-scan`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${session?.access_token || ""}`,
-    },
+    headers: await authHeaders(),
     body: JSON.stringify({
       ticketId: params.ticketId,
       eventId: params.eventId,
@@ -75,11 +72,27 @@ export async function scanGatekeeperTicket(params: {
   return await res.json();
 }
 
+// Live Telemetry & Event Analytics
+export async function fetchEventStats(eventId: number) {
+  const res = await fetch(`${API_BASE}/admin/events/${eventId}/stats`, {
+    headers: await authHeaders(),
+  });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to load event statistics.");
+  }
+  return await res.json();
+}
+
 // Admin APIs
 export async function fetchEventRoster(eventId: number) {
   const res = await fetch(`${API_BASE}/admin/events/${eventId}/roster`, {
     headers: await authHeaders(),
   });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to load attendee roster.");
+  }
   return await res.json();
 }
 
@@ -89,6 +102,10 @@ export async function saveAdminEvent(evt: any) {
     headers: await authHeaders(),
     body: JSON.stringify(evt),
   });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to save event.");
+  }
   return await res.json();
 }
 
@@ -97,6 +114,10 @@ export async function deleteAdminEvent(eventId: number) {
     method: "DELETE",
     headers: await authHeaders(),
   });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Strict Level 2 Admin clearance required to delete events.");
+  }
   return await res.json();
 }
 
@@ -106,6 +127,10 @@ export async function saveAdminStage(stage: any) {
     headers: await authHeaders(),
     body: JSON.stringify(stage),
   });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to save stage tier.");
+  }
   return await res.json();
 }
 
@@ -114,5 +139,9 @@ export async function deleteAdminStage(stageId: number) {
     method: "DELETE",
     headers: await authHeaders(),
   });
+  if (!res.ok) {
+    const error = await res.json().catch(() => ({}));
+    throw new Error(error.message || "Failed to delete stage tier.");
+  }
   return await res.json();
 }

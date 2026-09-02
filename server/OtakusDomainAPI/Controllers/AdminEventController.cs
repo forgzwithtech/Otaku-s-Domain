@@ -28,7 +28,57 @@ public class AdminEventsController : ControllerBase
         return user != null && (user.Role == UserRole.Admin || user.Role == UserRole.Moderator);
     }
 
-    // 1. Get Live Attendee Roster
+    private async Task<bool> IsStrictAdminAsync()
+    {
+        var sub = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+        if (!Guid.TryParse(sub, out var userId)) return false;
+        var user = await _context.UserProfiles.FindAsync(userId);
+        return user != null && user.Role == UserRole.Admin;
+    }
+
+    // Live Event Telemetry & Ticket Breakdown Stats
+    [HttpGet("{id}/stats")]
+    public async Task<IActionResult> GetEventStats(int id)
+    {
+        if (!await IsAdminOrModAsync()) return Forbid();
+
+        var evt = await _context.GuildEvents
+            .Include(e => e.TicketStages)
+            .Include(e => e.IssuedTickets)
+            .FirstOrDefaultAsync(e => e.Id == id);
+
+        if (evt == null) return NotFound("Event not found.");
+
+        var paidTickets = evt.IssuedTickets.Where(t => t.IsPaid).ToList();
+        var totalIssued = paidTickets.Count;
+        var checkedInCount = paidTickets.Count(t => t.Status == TicketStatus.CheckedIn);
+        var presaleVouchersCount = paidTickets.Count(t => t.IsPresaleVoucher);
+        var totalRevenue = paidTickets.Sum(t => t.PurchaseAmount);
+
+        var tierBreakdown = evt.TicketStages.Select(s => new
+        {
+            s.Id,
+            s.StageName,
+            StageType = s.StageType.ToString(),
+            s.BasePrice,
+            s.TotalCapacity,
+            Sold = paidTickets.Count(t => t.TicketStageId == s.Id),
+            CheckedIn = paidTickets.Count(t => t.TicketStageId == s.Id && t.Status == TicketStatus.CheckedIn)
+        }).ToList();
+
+        return Ok(new
+        {
+            eventId = evt.Id,
+            title = evt.Title,
+            totalIssued,
+            checkedInCount,
+            presaleVouchersCount,
+            totalRevenue,
+            tierBreakdown
+        });
+    }
+
+    // Get Live Attendee Roster
     [HttpGet("{id}/roster")]
     public async Task<IActionResult> GetEventRoster(int id)
     {
@@ -59,7 +109,6 @@ public class AdminEventsController : ControllerBase
         return Ok(passes);
     }
 
-    // 2. Save / Update Event Parameters
     public record UpsertEventDto(
         int Id,
         string Title,
@@ -125,11 +174,12 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Event saved." });
     }
 
-    // 3. Delete Event from Database
+    // Delete Event from Database — STRICT ADMIN ONLY
     [HttpDelete("{id}")]
     public async Task<IActionResult> DeleteEvent(int id)
     {
-        if (!await IsAdminOrModAsync()) return Forbid();
+        if (!await IsStrictAdminAsync())
+            return StatusCode(StatusCodes.Status403Forbidden, new { message = "Only Level 2 Administrators can decommission events." });
 
         var evt = await _context.GuildEvents
             .Include(e => e.TicketStages)
@@ -143,7 +193,6 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Event deleted permanently." });
     }
 
-    // 4. Save or Update Ticket Stage
     public record UpsertStageDto(
         int? Id,
         int EventId,
@@ -210,7 +259,6 @@ public class AdminEventsController : ControllerBase
         return Ok(new { success = true, message = "Stage configuration saved." });
     }
 
-    // 5. Delete Ticket Stage
     [HttpDelete("stages/{id}")]
     public async Task<IActionResult> DeleteStage(int id)
     {
