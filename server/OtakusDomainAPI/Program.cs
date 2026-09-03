@@ -1,5 +1,4 @@
 using System.Security.Claims;
-using System.Text;
 using System.Text.Json.Serialization;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
@@ -12,14 +11,18 @@ AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
 var builder = WebApplication.CreateBuilder(args);
 
+// Configure Render Port Binding (binds to 0.0.0.0:$PORT or defaults to 8080/5000)
+var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
+builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
+
 // 1. Database Configuration with Connection Resiliency
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
     {
         npgsqlOptions.EnableRetryOnFailure(
-            maxRetryCount: 5,
-            maxRetryDelay: TimeSpan.FromSeconds(10),
+            maxRetryCount: 3,
+            maxRetryDelay: TimeSpan.FromSeconds(5),
             errorCodesToAdd: null);
     }));
 
@@ -28,14 +31,17 @@ builder.Services.AddCors(options =>
 {
     options.AddPolicy("OtakusDomainPolicy", policy =>
     {
-        policy.WithOrigins("http://localhost:5173", "https://theotakusdomain.vercel.app")
+        policy.WithOrigins(
+                "http://localhost:5173", 
+                "https://theotakusdomain.vercel.app"
+              )
               .AllowAnyHeader()
               .AllowAnyMethod()
               .AllowCredentials();
     });
 });
 
-// 3. Global JSON Serialization Settings (Prevents Cyclic Dependency Crashes)
+// 3. Global JSON Serialization Settings
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -44,8 +50,7 @@ builder.Services.AddControllers()
     });
 
 // 4. Supabase JWT Auth Setup
-var jwksUri = builder.Configuration["Supabase:JwksUri"] 
-    ?? throw new InvalidOperationException("Supabase JWKS Uri is missing.");
+var jwksUri = builder.Configuration["Supabase:JwksUri"];
 var jwtIssuer = builder.Configuration["Supabase:Issuer"];
 
 builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
@@ -56,12 +61,20 @@ builder.Services.AddAuthentication(JwtBearerDefaults.AuthenticationScheme)
             ValidateIssuerSigningKey = true,
             IssuerSigningKeyResolver = (token, securityToken, kid, parameters) =>
             {
-                var client = new HttpClient();
-                var json = client.GetStringAsync(jwksUri).Result;
-                var keys = new Microsoft.IdentityModel.Tokens.JsonWebKeySet(json);
-                return keys.GetSigningKeys();
+                if (string.IsNullOrWhiteSpace(jwksUri)) return Enumerable.Empty<SecurityKey>();
+                try
+                {
+                    using var client = new HttpClient();
+                    var json = client.GetStringAsync(jwksUri).Result;
+                    var keys = new JsonWebKeySet(json);
+                    return keys.GetSigningKeys();
+                }
+                catch
+                {
+                    return Enumerable.Empty<SecurityKey>();
+                }
             },
-            ValidateIssuer = true,
+            ValidateIssuer = !string.IsNullOrWhiteSpace(jwtIssuer),
             ValidIssuer = jwtIssuer,
             ValidateAudience = false,
             ValidateLifetime = true,
@@ -85,27 +98,41 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
-if (app.Environment.IsDevelopment())
+// Enable Swagger in Production so you can check live endpoints from your browser
+app.UseSwagger();
+app.UseSwaggerUI(c =>
 {
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
+    c.SwaggerEndpoint("/swagger/v1/swagger.json", "Otaku's Domain API v1");
+    c.RoutePrefix = "swagger";
+});
 
 app.UseCors("OtakusDomainPolicy");
+
+// Instant Render Health-Check Handshakes (Bypasses Auth & DB delays)
+app.MapGet("/", () => Results.Ok(new 
+{ 
+    status = "Online", 
+    service = "Otaku's Domain Core Engine", 
+    timestamp = DateTime.UtcNow 
+}));
+
+app.MapGet("/health", () => Results.Ok("healthy"));
+
 app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// 6. Database Initialization & Fallback Seeding
-using (var scope = app.Services.CreateScope())
+// 6. Non-Blocking Database Seeding (Runs in background so port opens immediately)
+_ = Task.Run(async () =>
 {
+    await Task.Delay(2000); // Give web server time to start accepting traffic
+    using var scope = app.Services.CreateScope();
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
-        db.Database.EnsureCreated();
 
-        // Seed Landing Slides
-        if (!db.LandingSlides.Any())
+        // Seed Landing Slides if none exist
+        if (!await db.LandingSlides.AnyAsync())
         {
             db.LandingSlides.AddRange(
                 new LandingSlide 
@@ -119,6 +146,7 @@ using (var scope = app.Services.CreateScope())
                     Kanji = "オタクコネクト", 
                     Desc = "500+ fans. Watch party, cosplay showdown, guild war points on the line.", 
                     BtnText = "Grab Your Tickets", 
+                    TargetUrl = "/events",
                     ImageUrl = "/assets/fest.jpeg", 
                     DisplayOrder = 1 
                 },
@@ -133,52 +161,44 @@ using (var scope = app.Services.CreateScope())
                     Kanji = "最新のリリース", 
                     Desc = "Demon Slayer Hashira Training Arc Ep 4 is out. Jump in the forums.", 
                     BtnText = "Enter The Vault", 
+                    TargetUrl = "/vault",
                     ImageUrl = "/assets/fest.jpeg", 
                     DisplayOrder = 2 
                 }
             );
-            db.SaveChanges();
+            await db.SaveChangesAsync();
         }
 
-        // Seed Store Drops & Products with AngleImagesJson
-        if (!db.StoreProducts.Any())
+        // Seed Store Drops if empty
+        if (!await db.StoreProducts.AnyAsync())
         {
-            var apparelCat = db.StoreCategories.FirstOrDefault(c => c.Slug == "shirts") ?? new StoreCategory 
-            { 
-                Name = "T-Shirts & Tops", 
-                Slug = "shirts", 
-                KanjiTitle = "上着", 
-                DisplayOrder = 1 
-            };
+            var apparelCat = await db.StoreCategories.FirstOrDefaultAsync(c => c.Slug == "shirts") 
+                ?? new StoreCategory { Name = "T-Shirts & Tops", Slug = "shirts", KanjiTitle = "上着", DisplayOrder = 1 };
             
-            var headwearCat = db.StoreCategories.FirstOrDefault(c => c.Slug == "caps") ?? new StoreCategory 
-            { 
-                Name = "Caps & Headwear", 
-                Slug = "caps", 
-                KanjiTitle = "頭飾", 
-                DisplayOrder = 2 
-            };
+            var headwearCat = await db.StoreCategories.FirstOrDefaultAsync(c => c.Slug == "caps") 
+                ?? new StoreCategory { Name = "Caps & Headwear", Slug = "caps", KanjiTitle = "頭飾", DisplayOrder = 2 };
             
             if (apparelCat.Id == 0) db.StoreCategories.Add(apparelCat);
             if (headwearCat.Id == 0) db.StoreCategories.Add(headwearCat);
-            db.SaveChanges();
+            await db.SaveChangesAsync();
 
-            var aotDrop = db.StoreCollectionDrops.FirstOrDefault(d => d.Slug == "survey-corps-01") ?? new StoreCollectionDrop
-            {
-                Title = "The Survey Corps Division // Drop 01",
-                Slug = "survey-corps-01",
-                ThemeTag = "SHINGEKI_CORE",
-                KanjiSubtitle = "調査兵団限定コレクション",
-                BannerImageUrl = "/assets/fest.jpeg",
-                IsActive = true
-            };
+            var aotDrop = await db.StoreCollectionDrops.FirstOrDefaultAsync(d => d.Slug == "survey-corps-01") 
+                ?? new StoreCollectionDrop
+                {
+                    Title = "The Survey Corps Division // Drop 01",
+                    Slug = "survey-corps-01",
+                    ThemeTag = "SHINGEKI_CORE",
+                    KanjiSubtitle = "調査兵団限定コレクション",
+                    BannerImageUrl = "/assets/fest.jpeg",
+                    IsActive = true
+                };
+
             if (aotDrop.Id == 0) 
             { 
                 db.StoreCollectionDrops.Add(aotDrop); 
-                db.SaveChanges(); 
+                await db.SaveChangesAsync(); 
             }
 
-            // 1. Attack on Titan Oversized Tee
             var aotTee = new StoreProduct
             {
                 CategoryId = apparelCat.Id,
@@ -194,29 +214,19 @@ using (var scope = app.Services.CreateScope())
                 IsSoldOut = false
             };
             db.StoreProducts.Add(aotTee);
-            db.SaveChanges();
+            await db.SaveChangesAsync();
 
-            var blackVariant = new StoreProductVariant
-            {
-                ProductId = aotTee.Id,
-                ColorName = "Obsidian Black",
-                ColorHex = "#121212",
-                AngleImagesJson = "[{\"viewAngleName\":\"Front Chest\",\"imageUrl\":\"https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1000&auto=format&fit=crop\"},{\"viewAngleName\":\"Back Wings\",\"imageUrl\":\"https://images.unsplash.com/photo-1583743814966-8936f5b7be1a?q=80&w=1000&auto=format&fit=crop\"}]",
-                AdditionalPrice = 0.00m
-            };
+            db.StoreProductVariants.AddRange(
+                new StoreProductVariant
+                {
+                    ProductId = aotTee.Id,
+                    ColorName = "Obsidian Black",
+                    ColorHex = "#121212",
+                    AngleImagesJson = "[{\"viewAngleName\":\"Front Chest\",\"imageUrl\":\"https://images.unsplash.com/photo-1521572267360-ee0c2909d518?q=80&w=1000&auto=format&fit=crop\"}]",
+                    AdditionalPrice = 0.00m
+                }
+            );
 
-            var whiteVariant = new StoreProductVariant
-            {
-                ProductId = aotTee.Id,
-                ColorName = "Off White",
-                ColorHex = "#f5f5f0",
-                AngleImagesJson = "[{\"viewAngleName\":\"Front Inverted\",\"imageUrl\":\"https://images.unsplash.com/photo-1618354691373-d851c5c3a990?q=80&w=1000&auto=format&fit=crop\"},{\"viewAngleName\":\"Back Titan\",\"imageUrl\":\"https://images.unsplash.com/photo-1529374255404-311a2a4f1fd9?q=80&w=1000&auto=format&fit=crop\"}]",
-                AdditionalPrice = 0.00m
-            };
-
-            db.StoreProductVariants.AddRange(blackVariant, whiteVariant);
-
-            // 2. Otaku's Domain Snapback Cap
             var otakuCap = new StoreProduct
             {
                 CategoryId = headwearCat.Id,
@@ -224,7 +234,7 @@ using (var scope = app.Services.CreateScope())
                 Title = "Otaku's Domain Kanji Structured Snapback Cap",
                 Slug = "otakus-domain-kanji-snapback",
                 Tagline = "3D Embroidered Front Panel • Akure Sector Edition",
-                Description = "High-profile structured snapback cap with reinforced wool-blend construction and custom kanji rear embroidery.",
+                Description = "High-profile structured snapback cap with reinforced wool-blend construction.",
                 BasePrice = 7500.00m,
                 ThumbnailUrl = "https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000&auto=format&fit=crop",
                 AvailableSizesJson = "[\"ONE SIZE\"]",
@@ -232,27 +242,23 @@ using (var scope = app.Services.CreateScope())
                 IsSoldOut = false
             };
             db.StoreProducts.Add(otakuCap);
-            db.SaveChanges();
+            await db.SaveChangesAsync();
 
-            var capBlack = new StoreProductVariant
+            db.StoreProductVariants.Add(new StoreProductVariant
             {
                 ProductId = otakuCap.Id,
                 ColorName = "Pitch Black",
                 ColorHex = "#09090b",
-                AngleImagesJson = "[{\"viewAngleName\":\"Front 3D Kanji\",\"imageUrl\":\"https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000&auto=format&fit=crop\"},{\"viewAngleName\":\"Rear Strap\",\"imageUrl\":\"https://images.unsplash.com/photo-1575428652377-a2d80e2277fc?q=80&w=1000&auto=format&fit=crop\"}]",
+                AngleImagesJson = "[{\"viewAngleName\":\"Front 3D Kanji\",\"imageUrl\":\"https://images.unsplash.com/photo-1588850561407-ed78c282e89b?q=80&w=1000&auto=format&fit=crop\"}]",
                 AdditionalPrice = 0.00m
-            };
-
-            db.StoreProductVariants.Add(capBlack);
-            db.SaveChanges();
+            });
+            await db.SaveChangesAsync();
         }
     }
     catch (Exception ex)
     {
-        Console.ForegroundColor = ConsoleColor.Yellow;
-        Console.WriteLine($"[Database Init Warning]: {ex.Message}");
-        Console.ResetColor();
+        Console.WriteLine($"[Background DB Warning]: {ex.Message}");
     }
-}
+});
 
 app.Run();
