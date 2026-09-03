@@ -7,15 +7,31 @@ using OtakusDomainAPI.Data;
 using OtakusDomainAPI.Models;
 using OtakusDomainAPI.Services;
 
+// 1. Force polling over Linux inotify to avoid container handle exhaustion
+Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
-var builder = WebApplication.CreateBuilder(args);
+// 2. Build WebApplication without reloadOnChange file watchers
+var builderOptions = new WebApplicationOptions
+{
+    Args = args,
+    ContentRootPath = AppContext.BaseDirectory
+};
 
-// Configure Render Port Binding (binds to 0.0.0.0:$PORT or defaults to 8080/5000)
+var builder = WebApplication.CreateBuilder(builderOptions);
+
+// Prevent FileSystemWatcher inotify crashes on appsettings.json
+builder.Configuration.Sources.Clear();
+builder.Configuration
+    .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
+    .AddJsonFile($"appsettings.{builder.Environment.EnvironmentName}.json", optional: true, reloadOnChange: false)
+    .AddEnvironmentVariables();
+
+// Configure Render Port Binding (0.0.0.0:$PORT)
 var port = Environment.GetEnvironmentVariable("PORT") ?? "8080";
 builder.WebHost.UseUrls($"http://0.0.0.0:{port}");
 
-// 1. Database Configuration with Connection Resiliency
+// 3. Database Configuration with Connection Resiliency
 var connectionString = builder.Configuration.GetConnectionString("DefaultConnection");
 builder.Services.AddDbContext<AppDbContext>(options =>
     options.UseNpgsql(connectionString, npgsqlOptions =>
@@ -26,7 +42,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorCodesToAdd: null);
     }));
 
-// 2. CORS Policy
+// 4. CORS Policy
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("OtakusDomainPolicy", policy =>
@@ -41,7 +57,7 @@ builder.Services.AddCors(options =>
     });
 });
 
-// 3. Global JSON Serialization Settings
+// 5. Global JSON Serialization Settings
 builder.Services.AddControllers()
     .AddJsonOptions(options =>
     {
@@ -49,7 +65,7 @@ builder.Services.AddControllers()
         options.JsonSerializerOptions.DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull;
     });
 
-// 4. Supabase JWT Auth Setup
+// 6. Supabase JWT Auth Setup
 var jwksUri = builder.Configuration["Supabase:JwksUri"];
 var jwtIssuer = builder.Configuration["Supabase:Issuer"];
 
@@ -92,13 +108,13 @@ builder.Services.AddAuthorization(options =>
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-// 5. Dependency Injection Services
+// 7. Dependency Injection Services
 builder.Services.AddHttpClient<IPaystackService, PaystackService>();
 builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
-// Enable Swagger in Production so you can check live endpoints from your browser
+// Enable Swagger in Production
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -108,7 +124,7 @@ app.UseSwaggerUI(c =>
 
 app.UseCors("OtakusDomainPolicy");
 
-// Instant Render Health-Check Handshakes (Bypasses Auth & DB delays)
+// Instant Health Endpoints for Render
 app.MapGet("/", () => Results.Ok(new 
 { 
     status = "Online", 
@@ -122,16 +138,15 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// 6. Non-Blocking Database Seeding (Runs in background so port opens immediately)
+// 8. Non-blocking Database Seeding (Runs after the web server binds the port)
 _ = Task.Run(async () =>
 {
-    await Task.Delay(2000); // Give web server time to start accepting traffic
+    await Task.Delay(2000);
     using var scope = app.Services.CreateScope();
     try
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Seed Landing Slides if none exist
         if (!await db.LandingSlides.AnyAsync())
         {
             db.LandingSlides.AddRange(
@@ -169,7 +184,6 @@ _ = Task.Run(async () =>
             await db.SaveChangesAsync();
         }
 
-        // Seed Store Drops if empty
         if (!await db.StoreProducts.AnyAsync())
         {
             var apparelCat = await db.StoreCategories.FirstOrDefaultAsync(c => c.Slug == "shirts") 
