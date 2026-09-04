@@ -7,7 +7,7 @@ using OtakusDomainAPI.Data;
 using OtakusDomainAPI.Models;
 using OtakusDomainAPI.Services;
 
-// 1. Force polling over Linux inotify to avoid container handle exhaustion
+// 1. Force polling over Linux inotify to avoid container handle exhaustion on Render
 Environment.SetEnvironmentVariable("DOTNET_USE_POLLING_FILE_WATCHER", "true");
 AppContext.SetSwitch("Npgsql.EnableLegacyTimestampBehavior", true);
 
@@ -42,7 +42,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
             errorCodesToAdd: null);
     }));
 
-// 4. CORS Policy
+// 4. CORS Policy Setup
 builder.Services.AddCors(options =>
 {
     options.AddPolicy("OtakusDomainPolicy", policy =>
@@ -114,6 +114,20 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
+// CRITICAL: CORS must run first in the middleware pipeline to guarantee headers on 4xx/5xx responses
+app.UseCors("OtakusDomainPolicy");
+
+// Global Exception Handler that retains CORS headers on 500 errors
+app.UseExceptionHandler(errorApp =>
+{
+    errorApp.Run(async context =>
+    {
+        context.Response.StatusCode = 500;
+        context.Response.ContentType = "application/json";
+        await context.Response.WriteAsync("{\"success\":false,\"message\":\"Internal server exception caught.\"}");
+    });
+});
+
 // Enable Swagger in Production
 app.UseSwagger();
 app.UseSwaggerUI(c =>
@@ -122,9 +136,7 @@ app.UseSwaggerUI(c =>
     c.RoutePrefix = "swagger";
 });
 
-app.UseCors("OtakusDomainPolicy");
-
-// Instant Health Endpoints for Render
+// Instant Health Endpoints for Render routing
 app.MapGet("/", () => Results.Ok(new 
 { 
     status = "Online", 
@@ -138,7 +150,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// 8. Non-blocking Database Seeding (Runs after the web server binds the port)
+// 8. Non-blocking Database Seeding (Executes after server binds to port)
 _ = Task.Run(async () =>
 {
     await Task.Delay(2000);
@@ -147,6 +159,21 @@ _ = Task.Run(async () =>
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
+        // Ensure default daily trial exists
+        var today = DateTime.UtcNow.Date;
+        if (!await db.DailyTrials.AnyAsync(t => t.ActiveDate.Date == today))
+        {
+            db.DailyTrials.Add(new DailyTrial
+            {
+                Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
+                CorrectAnswer = "Oetsu Nimaiya",
+                RewardPoints = 50,
+                ActiveDate = today
+            });
+            await db.SaveChangesAsync();
+        }
+
+        // Seed Landing Slides if missing
         if (!await db.LandingSlides.AnyAsync())
         {
             db.LandingSlides.AddRange(
@@ -184,6 +211,7 @@ _ = Task.Run(async () =>
             await db.SaveChangesAsync();
         }
 
+        // Seed Store Drops if missing
         if (!await db.StoreProducts.AnyAsync())
         {
             var apparelCat = await db.StoreCategories.FirstOrDefaultAsync(c => c.Slug == "shirts") 

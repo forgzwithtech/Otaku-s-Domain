@@ -19,12 +19,12 @@ public class LandingController : ControllerBase
     {
         _context = context;
     }
-[HttpGet("slides")]
+
+    [HttpGet("slides")]
     public async Task<ActionResult<IEnumerable<LandingSlide>>> GetSlides()
     {
         var slides = await _context.LandingSlides.OrderBy(s => s.DisplayOrder).ToListAsync();
         
-        // Fallback seed data if database hasn't been populated
         if (!slides.Any())
         {
             return Ok(new[]
@@ -60,110 +60,157 @@ public class LandingController : ControllerBase
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
         var today = DateTime.UtcNow.Date;
-        var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today) 
-                    ?? new DailyTrial { Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", RewardPoints = 50 };
+        var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
+
+        if (trial == null)
+        {
+            // Auto-persist default trial if missing
+            trial = new DailyTrial 
+            { 
+                Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", 
+                CorrectAnswer = "Oetsu Nimaiya", 
+                RewardPoints = 50,
+                ActiveDate = today 
+            };
+            _context.DailyTrials.Add(trial);
+            await _context.SaveChangesAsync();
+        }
+
         return Ok(trial);
     }
 
-[HttpPost("submit-trial")]
-[Authorize]
-public async Task<IActionResult> SubmitTrial([FromBody] TriviaSubmissionDto dto)
-{
-    var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-    if (!Guid.TryParse(userIdString, out var userId))
-        return Unauthorized("Invalid token subject.");
-
-    var user = await _context.UserProfiles.FindAsync(userId);
-    if (user == null) return NotFound("User profile not found.");
-
-    var today = DateTime.UtcNow.Date;
-    var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
-
-    if (trial == null)
-        return NotFound("No active trial found for today.");
-
-    bool isCorrect = string.Equals(trial.CorrectAnswer.Trim(), dto.Answer?.Trim(), StringComparison.OrdinalIgnoreCase);
-
-    if (!isCorrect)
+    [HttpPost("submit-trial")]
+    [Authorize]
+    public async Task<IActionResult> SubmitTrial([FromBody] TriviaSubmissionDto dto)
     {
-        return BadRequest(new { success = false, message = "Incorrect answer." });
+        try
+        {
+            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+            if (!Guid.TryParse(userIdString, out var userId))
+                return Unauthorized(new { success = false, message = "Invalid token subject." });
+
+            var user = await _context.UserProfiles.FindAsync(userId);
+            if (user == null) 
+                return NotFound(new { success = false, message = "User profile not found." });
+
+            var today = DateTime.UtcNow.Date;
+            var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
+
+            // Safe fallback if trial has not been created for today yet
+            if (trial == null)
+            {
+                trial = new DailyTrial 
+                { 
+                    Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", 
+                    CorrectAnswer = "Oetsu Nimaiya", 
+                    RewardPoints = 50,
+                    ActiveDate = today 
+                };
+                _context.DailyTrials.Add(trial);
+                await _context.SaveChangesAsync();
+            }
+
+            if (string.IsNullOrWhiteSpace(dto.Answer))
+            {
+                return BadRequest(new { success = false, message = "Answer cannot be empty." });
+            }
+
+            var cleanExpected = (trial.CorrectAnswer ?? string.Empty).Trim().ToLower();
+            var cleanActual = dto.Answer.Trim().ToLower();
+
+            bool isCorrect = cleanExpected == cleanActual || 
+                             cleanActual.Contains(cleanExpected) || 
+                             cleanExpected.Contains(cleanActual);
+
+            if (!isCorrect)
+            {
+                return BadRequest(new { success = false, message = "Incorrect answer. Try again, operative!" });
+            }
+
+            int finalReward = trial.RewardPoints;
+
+            // Safe Underdog multiplier calculation
+            var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
+            var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
+
+            if (blueCount < redCount && user.Faction == GuildFaction.Blue)
+            {
+                finalReward = (int)(finalReward * 1.20);
+            }
+            else if (redCount < blueCount && user.Faction == GuildFaction.Red)
+            {
+                finalReward = (int)(finalReward * 1.20);
+            }
+
+            user.QuestPoints += finalReward;
+            user.UpdatedAt = DateTime.UtcNow;
+            await _context.SaveChangesAsync();
+
+            return Ok(new { 
+                success = true, 
+                rewardPoints = finalReward, 
+                message = $"Correct! +{finalReward} QP added to your ledger." 
+            });
+        }
+        catch (Exception ex)
+        {
+            return StatusCode(500, new { success = false, message = $"Telemetry failure: {ex.Message}" });
+        }
     }
 
-    // Calculate base reward points
-    int finalReward = trial.RewardPoints;
-
-    // Check if user's faction matches the current underdog faction for the +20% bonus
-    var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
-    var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
-
-    string underdog = blueCount < redCount ? "Blue" : redCount < blueCount ? "Red" : "";
-    if (user.Faction.ToString() == underdog)
+    [HttpPost("recruit")]
+    public async Task<IActionResult> SubmitRecruitment([FromBody] RecruitmentDto dto)
     {
-        finalReward = (int)(finalReward * 1.20); // +20% Underdog Multiplier!
+        if (string.IsNullOrWhiteSpace(dto.Handle))
+            return BadRequest(new { success = false, message = "Handle cannot be empty." });
+
+        var cleanHandle = dto.Handle.Trim();
+        
+        bool exists = await _context.RecruitmentSubmissions.AnyAsync(r => r.Handle.ToLower() == cleanHandle.ToLower());
+        if (exists)
+        {
+            return Ok(new { success = true, message = "Handle already logged for video casting!" });
+        }
+
+        var submission = new RecruitmentSubmission
+        {
+            Handle = cleanHandle
+        };
+
+        _context.RecruitmentSubmissions.Add(submission);
+        await _context.SaveChangesAsync();
+
+        return Ok(new { success = true, message = "Transmission received! You're in the casting queue." });
     }
 
-    // Add final calculated points to user profile ledger once
-    user.QuestPoints += finalReward;
-    user.UpdatedAt = DateTime.UtcNow;
-    await _context.SaveChangesAsync();
-
-    return Ok(new { success = true, rewardPoints = finalReward, message = $"Correct! +{finalReward} QP added to your ledger." });
-}
-
-[HttpPost("recruit")]
-public async Task<IActionResult> SubmitRecruitment([FromBody] RecruitmentDto dto)
-{
-    if (string.IsNullOrWhiteSpace(dto.Handle))
-        return BadRequest(new { success = false, message = "Handle cannot be empty." });
-
-    var cleanHandle = dto.Handle.Trim();
-    
-    // Check if handle already exists to avoid spam
-    bool exists = await _context.RecruitmentSubmissions.AnyAsync(r => r.Handle.ToLower() == cleanHandle.ToLower());
-    if (exists)
+    [HttpGet("sponsors")]
+    public async Task<ActionResult<IEnumerable<Sponsor>>> GetSponsors()
     {
-        return Ok(new { success = true, message = "Handle already logged for video casting!" });
+        var sponsors = await _context.Sponsors.OrderBy(s => s.DisplayOrder).ToListAsync();
+        return Ok(sponsors);
     }
 
-    var submission = new RecruitmentSubmission
+    [HttpPost("sponsors")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<ActionResult<Sponsor>> CreateSponsor([FromBody] Sponsor sponsor)
     {
-        Handle = cleanHandle
-    };
+        if (string.IsNullOrWhiteSpace(sponsor.Name) || string.IsNullOrWhiteSpace(sponsor.WebsiteUrl))
+            return BadRequest(new { success = false, message = "Name and Website URL are required." });
 
-    _context.RecruitmentSubmissions.Add(submission);
-    await _context.SaveChangesAsync();
+        _context.Sponsors.Add(sponsor);
+        await _context.SaveChangesAsync();
+        return Ok(sponsor);
+    }
 
-    return Ok(new { success = true, message = "Transmission received! You're in the casting queue." });
-}
+    [HttpDelete("sponsors/{id}")]
+    [Authorize(Policy = "AdminOnly")]
+    public async Task<IActionResult> DeleteSponsor(int id)
+    {
+        var sponsor = await _context.Sponsors.FindAsync(id);
+        if (sponsor == null) return NotFound();
 
-[HttpGet("sponsors")]
-public async Task<ActionResult<IEnumerable<Sponsor>>> GetSponsors()
-{
-    var sponsors = await _context.Sponsors.OrderBy(s => s.DisplayOrder).ToListAsync();
-    return Ok(sponsors);
-}
-
-[HttpPost("sponsors")]
-[Authorize(Policy = "AdminOnly")]
-public async Task<ActionResult<Sponsor>> CreateSponsor([FromBody] Sponsor sponsor)
-{
-    if (string.IsNullOrWhiteSpace(sponsor.Name) || string.IsNullOrWhiteSpace(sponsor.WebsiteUrl))
-        return BadRequest(new { success = false, message = "Name and Website URL are required." });
-
-    _context.Sponsors.Add(sponsor);
-    await _context.SaveChangesAsync();
-    return Ok(sponsor);
-}
-
-[HttpDelete("sponsors/{id}")]
-[Authorize(Policy = "AdminOnly")]
-public async Task<IActionResult> DeleteSponsor(int id)
-{
-    var sponsor = await _context.Sponsors.FindAsync(id);
-    if (sponsor == null) return NotFound();
-
-    _context.Sponsors.Remove(sponsor);
-    await _context.SaveChangesAsync();
-    return Ok(new { success = true, message = "Sponsor removed." });
-}
+        _context.Sponsors.Remove(sponsor);
+        await _context.SaveChangesAsync();
+        return Ok(new { success = true, message = "Sponsor removed." });
+    }
 }
