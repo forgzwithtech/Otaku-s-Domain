@@ -20,7 +20,6 @@ var builderOptions = new WebApplicationOptions
 
 var builder = WebApplication.CreateBuilder(builderOptions);
 
-// Prevent FileSystemWatcher inotify crashes on appsettings.json
 builder.Configuration.Sources.Clear();
 builder.Configuration
     .AddJsonFile("appsettings.json", optional: true, reloadOnChange: false)
@@ -114,21 +113,9 @@ builder.Services.AddScoped<IEmailService, EmailService>();
 
 var app = builder.Build();
 
-// CRITICAL: CORS must run first in the middleware pipeline to guarantee headers on 4xx/5xx responses
+// CORS executes first to ensure headers exist on all status codes
 app.UseCors("OtakusDomainPolicy");
 
-// Global Exception Handler that retains CORS headers on 500 errors
-app.UseExceptionHandler(errorApp =>
-{
-    errorApp.Run(async context =>
-    {
-        context.Response.StatusCode = 500;
-        context.Response.ContentType = "application/json";
-        await context.Response.WriteAsync("{\"success\":false,\"message\":\"Internal server exception caught.\"}");
-    });
-});
-
-// Enable Swagger in Production
 app.UseSwagger();
 app.UseSwaggerUI(c =>
 {
@@ -150,7 +137,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 app.MapControllers();
 
-// 8. Non-blocking Database Seeding (Executes after server binds to port)
+// 8. Non-blocking Database Seeding
 _ = Task.Run(async () =>
 {
     await Task.Delay(2000);
@@ -159,21 +146,22 @@ _ = Task.Run(async () =>
     {
         var db = scope.ServiceProvider.GetRequiredService<AppDbContext>();
 
-        // Ensure default daily trial exists
-        var today = DateTime.UtcNow.Date;
-        if (!await db.DailyTrials.AnyAsync(t => t.ActiveDate.Date == today))
+        var utcNow = DateTime.UtcNow;
+        var startOfDay = DateTime.SpecifyKind(utcNow.Date, DateTimeKind.Utc);
+        var endOfDay = startOfDay.AddDays(1);
+
+        if (!await db.DailyTrials.AnyAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay))
         {
             db.DailyTrials.Add(new DailyTrial
             {
                 Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
                 CorrectAnswer = "Oetsu Nimaiya",
                 RewardPoints = 50,
-                ActiveDate = today
+                ActiveDate = startOfDay
             });
             await db.SaveChangesAsync();
         }
 
-        // Seed Landing Slides if missing
         if (!await db.LandingSlides.AnyAsync())
         {
             db.LandingSlides.AddRange(
@@ -211,7 +199,6 @@ _ = Task.Run(async () =>
             await db.SaveChangesAsync();
         }
 
-        // Seed Store Drops if missing
         if (!await db.StoreProducts.AnyAsync())
         {
             var apparelCat = await db.StoreCategories.FirstOrDefaultAsync(c => c.Slug == "shirts") 

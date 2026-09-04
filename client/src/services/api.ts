@@ -2,12 +2,9 @@ import { supabase } from '../lib/supabase';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
 
-async function getAuthHeaders() {
+export async function getAuthHeaders() {
   const { data: { session } } = await supabase.auth.getSession();
   const token = session?.access_token;
-
-  console.log("Supabase Session Active:", !!session);
-  console.log("Access Token Being Sent:", token ? token.substring(0, 15) + "..." : "NONE FOUND");
 
   return {
     'Content-Type': 'application/json',
@@ -57,10 +54,18 @@ export const landingService = {
     const res = await fetch(`${API_BASE_URL}/landing/daily-trial`);
     if (!res.ok) throw new Error('Failed to fetch daily trial.');
     return res.json();
+  },
+  async submitDailyTrial(answer: string) {
+    const headers = await getAuthHeaders();
+    const res = await fetch(`${API_BASE_URL}/landing/submit-trial`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ answer })
+    });
+    return await res.json();
   }
 };
 
-// In client/src/services/api.ts
 export async function claimQuestPoints(
   activityType: "ANIME_INTERACT" | "MANGA_COMPLETE",
   mediaId: string,
@@ -69,9 +74,8 @@ export async function claimQuestPoints(
   const { data: { session } } = await supabase.auth.getSession();
   if (!session?.access_token) return null;
 
-  const apiBase = import.meta.env.VITE_API_BASE_URL || 'https://otaku-s-domain.onrender.com/api';
   try {
-    const res = await fetch(`${apiBase}/quests/claim-activity`, {
+    const res = await fetch(`${API_BASE_URL}/quests/claim-activity`, {
       method: "POST",
       headers: {
         "Content-Type": "application/json",

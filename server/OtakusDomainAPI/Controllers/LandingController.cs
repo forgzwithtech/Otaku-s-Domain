@@ -56,10 +56,11 @@ public class LandingController : ControllerBase
         return Ok(slides);
     }
 
-[HttpGet("daily-trial")]
+    [HttpGet("daily-trial")]
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
-        var startOfDay = DateTime.UtcNow.Date;
+        var utcNow = DateTime.UtcNow;
+        var startOfDay = DateTime.SpecifyKind(utcNow.Date, DateTimeKind.Utc);
         var endOfDay = startOfDay.AddDays(1);
 
         var trial = await _context.DailyTrials
@@ -82,7 +83,6 @@ public class LandingController : ControllerBase
             }
             catch
             {
-                // Concurrency catch in case multiple simultaneous requests attempt to seed
                 trial = await _context.DailyTrials
                     .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay)
                     ?? trial;
@@ -99,17 +99,21 @@ public class LandingController : ControllerBase
         try
         {
             var subClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-            if (!Guid.TryParse(subClaim, out var userId))
-                return Unauthorized(new { success = false, message = "Invalid token authorization claim." });
+            if (string.IsNullOrWhiteSpace(subClaim) || !Guid.TryParse(subClaim, out var userId))
+            {
+                return Unauthorized(new { success = false, message = "Invalid token authorization subject." });
+            }
 
             var user = await _context.UserProfiles.FindAsync(userId);
             if (user == null)
-                return NotFound(new { success = false, message = "User operative dossier not found." });
+            {
+                return NotFound(new { success = false, message = "User operative profile not found." });
+            }
 
-            var startOfDay = DateTime.UtcNow.Date;
+            var utcNow = DateTime.UtcNow;
+            var startOfDay = DateTime.SpecifyKind(utcNow.Date, DateTimeKind.Utc);
             var endOfDay = startOfDay.AddDays(1);
 
-            // Safe range query compatible with PostgreSQL timestamps
             var trial = await _context.DailyTrials
                 .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay);
 
@@ -122,8 +126,18 @@ public class LandingController : ControllerBase
                     RewardPoints = 50,
                     ActiveDate = startOfDay
                 };
-                _context.DailyTrials.Add(trial);
-                await _context.SaveChangesAsync();
+
+                try
+                {
+                    _context.DailyTrials.Add(trial);
+                    await _context.SaveChangesAsync();
+                }
+                catch
+                {
+                    trial = await _context.DailyTrials
+                        .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay)
+                        ?? trial;
+                }
             }
 
             if (string.IsNullOrWhiteSpace(dto.Answer))
@@ -145,7 +159,6 @@ public class LandingController : ControllerBase
 
             int finalReward = trial.RewardPoints;
 
-            // Safe underdog bonus calculation
             var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
             var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
 
@@ -172,7 +185,6 @@ public class LandingController : ControllerBase
         }
         catch (Exception ex)
         {
-            // Surfaces precise error detail in the JSON body for diagnostics
             return StatusCode(500, new
             {
                 success = false,
@@ -181,6 +193,7 @@ public class LandingController : ControllerBase
             });
         }
     }
+
     [HttpPost("recruit")]
     public async Task<IActionResult> SubmitRecruitment([FromBody] RecruitmentDto dto)
     {
