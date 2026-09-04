@@ -55,12 +55,12 @@ export const landingService = {
     if (!res.ok) throw new Error('Failed to fetch daily trial.');
     return res.json();
   },
-  async submitDailyTrial(answer: string) {
+  async submitDailyTrial(answer: string, trialId?: number) {
     const headers = await getAuthHeaders();
     const res = await fetch(`${API_BASE_URL}/landing/submit-trial`, {
       method: 'POST',
       headers,
-      body: JSON.stringify({ answer })
+      body: JSON.stringify({ answer, trialId })
     });
     return await res.json();
   }

@@ -27,6 +27,7 @@ public class SetGuildDto
 public class TriviaSubmissionDto 
 { 
     public string Answer { get; set; } = string.Empty;
+    public int? TrialId { get; set; }
 }
 
 public class RecruitmentDto

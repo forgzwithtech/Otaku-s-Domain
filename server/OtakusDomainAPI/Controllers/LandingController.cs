@@ -9,6 +9,7 @@ using OtakusDomainAPI.Models;
 
 namespace OtakusDomainAPI.Controllers;
 
+
 [ApiController]
 [Route("api/[controller]")]
 public class LandingController : ControllerBase
@@ -59,13 +60,22 @@ public class LandingController : ControllerBase
     [HttpGet("daily-trial")]
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
-        var utcNow = DateTime.UtcNow;
-        var startOfDay = DateTime.SpecifyKind(utcNow.Date, DateTimeKind.Utc);
-        var endOfDay = startOfDay.AddDays(1);
+        var today = DateTime.UtcNow.Date;
 
-        var trial = await _context.DailyTrials
-            .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay);
+        // Fetch trials and perform date check in memory to bypass Npgsql timestamp translation edge cases
+        var allTrials = await _context.DailyTrials.ToListAsync();
+        var trial = allTrials.FirstOrDefault(t => t.ActiveDate.ToUniversalTime().Date == today);
 
+        // Fallback: Pick the most recent trial on or before today
+        if (trial == null)
+        {
+            trial = allTrials
+                .Where(t => t.ActiveDate.ToUniversalTime().Date <= today)
+                .OrderByDescending(t => t.ActiveDate)
+                .FirstOrDefault();
+        }
+
+        // Fallback: Default question if table is empty
         if (trial == null)
         {
             trial = new DailyTrial
@@ -73,7 +83,7 @@ public class LandingController : ControllerBase
                 Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
                 CorrectAnswer = "Oetsu Nimaiya",
                 RewardPoints = 50,
-                ActiveDate = startOfDay
+                ActiveDate = DateTime.SpecifyKind(today, DateTimeKind.Utc)
             };
 
             try
@@ -83,9 +93,7 @@ public class LandingController : ControllerBase
             }
             catch
             {
-                trial = await _context.DailyTrials
-                    .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay)
-                    ?? trial;
+                trial = await _context.DailyTrials.FirstOrDefaultAsync() ?? trial;
             }
         }
 
@@ -110,34 +118,28 @@ public class LandingController : ControllerBase
                 return NotFound(new { success = false, message = "User operative profile not found." });
             }
 
-            var utcNow = DateTime.UtcNow;
-            var startOfDay = DateTime.SpecifyKind(utcNow.Date, DateTimeKind.Utc);
-            var endOfDay = startOfDay.AddDays(1);
+            DailyTrial? trial = null;
 
-            var trial = await _context.DailyTrials
-                .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay);
+            // 1. Direct match by TrialId sent from frontend
+            if (dto.TrialId.HasValue && dto.TrialId.Value > 0)
+            {
+                trial = await _context.DailyTrials.FindAsync(dto.TrialId.Value);
+            }
+
+            // 2. Date-based match if TrialId was not provided
+            if (trial == null)
+            {
+                var today = DateTime.UtcNow.Date;
+                var allTrials = await _context.DailyTrials.ToListAsync();
+                trial = allTrials.FirstOrDefault(t => t.ActiveDate.ToUniversalTime().Date == today)
+                        ?? allTrials.Where(t => t.ActiveDate.ToUniversalTime().Date <= today)
+                                    .OrderByDescending(t => t.ActiveDate)
+                                    .FirstOrDefault();
+            }
 
             if (trial == null)
             {
-                trial = new DailyTrial
-                {
-                    Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
-                    CorrectAnswer = "Oetsu Nimaiya",
-                    RewardPoints = 50,
-                    ActiveDate = startOfDay
-                };
-
-                try
-                {
-                    _context.DailyTrials.Add(trial);
-                    await _context.SaveChangesAsync();
-                }
-                catch
-                {
-                    trial = await _context.DailyTrials
-                        .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay)
-                        ?? trial;
-                }
+                return NotFound(new { success = false, message = "No active daily trial found to verify." });
             }
 
             if (string.IsNullOrWhiteSpace(dto.Answer))

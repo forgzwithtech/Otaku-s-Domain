@@ -65,6 +65,9 @@ export default function TrialPipeline() {
     }
   };
 
+  // Compare using UTC date strings (YYYY-MM-DD) to align with server timestamps
+  const todayUtcStr = new Date().toISOString().split("T")[0];
+
   return (
     <div className="border-4 border-black bg-white p-6 md:p-8 shadow-[10px_10px_0px_#000] mb-8">
       <div className="mb-6 pb-4 border-b-2 border-black">
@@ -156,13 +159,15 @@ export default function TrialPipeline() {
             <div className="text-xs uppercase font-bold text-zinc-500 p-8 text-center">Loading trials...</div>
           ) : trials.length > 0 ? (
             trials.map((t) => {
-              const isToday = new Date(t.activeDate).toISOString().split("T")[0] === new Date().toISOString().split("T")[0];
+              const trialUtcDateStr = new Date(t.activeDate).toISOString().split("T")[0];
+              const isToday = trialUtcDateStr === todayUtcStr;
+
               return (
                 <div key={t.id} className={`border-2 border-black p-4 bg-white flex justify-between items-center shadow-[3px_3px_0px_#000] ${isToday ? "border-l-8 border-l-red-600 bg-yellow-50" : ""}`}>
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="bg-black text-white px-2 py-0.5 text-[10px] font-black uppercase">
-                        {new Date(t.activeDate).toLocaleDateString()}
+                        {trialUtcDateStr}
                       </span>
                       {isToday && <span className="bg-red-600 text-white px-2 py-0.5 text-[10px] font-black uppercase">ACTIVE TODAY</span>}
                       <span className="text-yellow-600 font-bold text-xs">+{t.rewardPoints} QP</span>
