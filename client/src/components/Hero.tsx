@@ -1,3 +1,4 @@
+// client/src/components/Hero.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import pageFlipSound from "../assets/page.ogg";

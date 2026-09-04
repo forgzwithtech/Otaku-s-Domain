@@ -26,6 +26,20 @@ public class LandingController : ControllerBase
         _context = context;
     }
 
+    private static string Normalize(string input)
+    {
+        if (string.IsNullOrWhiteSpace(input)) return string.Empty;
+        return input.Trim()
+            .ToLowerInvariant()
+            .Replace(".", "")
+            .Replace("!", "")
+            .Replace("?", "")
+            .Replace("'", "")
+            .Replace("\"", "")
+            .Replace("-", " ")
+            .Trim();
+    }
+
     [HttpGet("slides")]
     public async Task<ActionResult<IEnumerable<LandingSlide>>> GetSlides()
     {
@@ -65,48 +79,42 @@ public class LandingController : ControllerBase
     [HttpGet("daily-trial")]
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
-        var now = DateTime.UtcNow;
-        var todayUtcStr = now.ToString("yyyy-MM-dd");
-        var todayWatStr = now.AddHours(1).ToString("yyyy-MM-dd");
-
         var allTrials = await _context.DailyTrials.ToListAsync();
 
-        // 1. Check exact calendar date representation (matches UTC or WAT calendar date string)
-        var trial = allTrials.FirstOrDefault(t => 
-            t.ActiveDate.ToString("yyyy-MM-dd") == todayUtcStr ||
-            t.ActiveDate.ToString("yyyy-MM-dd") == todayWatStr ||
-            t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayUtcStr ||
-            t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayWatStr);
+        if (!allTrials.Any())
+        {
+            var fallback = new DailyTrial
+            {
+                Question = "What is the alias of Light Yagami when acting as a god of justice?",
+                CorrectAnswer = "Kira",
+                RewardPoints = 50,
+                ActiveDate = DateTime.SpecifyKind(DateTime.UtcNow.Date, DateTimeKind.Utc)
+            };
+            _context.DailyTrials.Add(fallback);
+            await _context.SaveChangesAsync();
+            return Ok(fallback);
+        }
 
-        // 2. Fallback: closest scheduled trial on or before today
+        var nowUtc = DateTime.UtcNow;
+        var todayUtcStr = nowUtc.ToString("yyyy-MM-dd");
+        var todayWatStr = nowUtc.AddHours(1).ToString("yyyy-MM-dd");
+
+        var validDateKeys = new HashSet<string> { todayUtcStr, todayWatStr };
+
+        // 1. Direct match for today's calendar date
+        var trial = allTrials.FirstOrDefault(t => 
+            validDateKeys.Contains(t.ActiveDate.ToString("yyyy-MM-dd")) ||
+            validDateKeys.Contains(t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd"))
+        );
+
+        // 2. Fallback to latest scheduled trial on or before today
         if (trial == null)
         {
             trial = allTrials
                 .Where(t => string.Compare(t.ActiveDate.ToString("yyyy-MM-dd"), todayWatStr) <= 0)
-                .OrderByDescending(t => t.ActiveDate)
-                .FirstOrDefault();
-        }
-
-        // 3. Fallback: default prompt if database is completely empty
-        if (trial == null)
-        {
-            trial = new DailyTrial
-            {
-                Question = "Who is the captain of the Fourth Division in Bleach?",
-                CorrectAnswer = "Retsu Unohana",
-                RewardPoints = 50,
-                ActiveDate = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc)
-            };
-
-            try
-            {
-                _context.DailyTrials.Add(trial);
-                await _context.SaveChangesAsync();
-            }
-            catch
-            {
-                trial = await _context.DailyTrials.FirstOrDefaultAsync() ?? trial;
-            }
+                .OrderByDescending(t => t.ActiveDate.ToString("yyyy-MM-dd"))
+                .FirstOrDefault()
+                ?? allTrials.OrderByDescending(t => t.ActiveDate).First();
         }
 
         return Ok(trial);
@@ -121,41 +129,39 @@ public class LandingController : ControllerBase
             var subClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
             if (string.IsNullOrWhiteSpace(subClaim) || !Guid.TryParse(subClaim, out var userId))
             {
-                return Unauthorized(new { success = false, message = "Invalid token authorization subject." });
+                return Unauthorized(new { success = false, message = "Invalid authorization token." });
             }
 
             var user = await _context.UserProfiles.FindAsync(userId);
             if (user == null)
             {
-                return NotFound(new { success = false, message = "User operative profile not found." });
+                return NotFound(new { success = false, message = "Operative dossier not found." });
             }
 
             DailyTrial? trial = null;
 
-            // Priority 1: Direct lookup by TrialId passed from Hero.tsx (guarantees validating the exact active question)
+            // 1. Direct match by TrialId sent from the frontend
             if (dto.TrialId.HasValue && dto.TrialId.Value > 0)
             {
                 trial = await _context.DailyTrials.FindAsync(dto.TrialId.Value);
             }
 
-            // Priority 2: Calendar date match
+            // 2. Fallback to date resolution
             if (trial == null)
             {
-                var now = DateTime.UtcNow;
-                var todayUtcStr = now.ToString("yyyy-MM-dd");
-                var todayWatStr = now.AddHours(1).ToString("yyyy-MM-dd");
+                var nowUtc = DateTime.UtcNow;
+                var todayUtcStr = nowUtc.ToString("yyyy-MM-dd");
+                var todayWatStr = nowUtc.AddHours(1).ToString("yyyy-MM-dd");
+                var validDateKeys = new HashSet<string> { todayUtcStr, todayWatStr };
 
                 var allTrials = await _context.DailyTrials.ToListAsync();
-
                 trial = allTrials.FirstOrDefault(t => 
-                    t.ActiveDate.ToString("yyyy-MM-dd") == todayUtcStr ||
-                    t.ActiveDate.ToString("yyyy-MM-dd") == todayWatStr ||
-                    t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayUtcStr ||
-                    t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayWatStr)
-                    ?? allTrials
-                        .Where(t => string.Compare(t.ActiveDate.ToString("yyyy-MM-dd"), todayWatStr) <= 0)
-                        .OrderByDescending(t => t.ActiveDate)
-                        .FirstOrDefault();
+                    validDateKeys.Contains(t.ActiveDate.ToString("yyyy-MM-dd")) ||
+                    validDateKeys.Contains(t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd"))
+                ) ?? allTrials
+                    .Where(t => string.Compare(t.ActiveDate.ToString("yyyy-MM-dd"), todayWatStr) <= 0)
+                    .OrderByDescending(t => t.ActiveDate.ToString("yyyy-MM-dd"))
+                    .FirstOrDefault();
             }
 
             if (trial == null)
@@ -165,15 +171,14 @@ public class LandingController : ControllerBase
 
             if (string.IsNullOrWhiteSpace(dto.Answer))
             {
-                return BadRequest(new { success = false, message = "Answer cannot be empty." });
+                return BadRequest(new { success = false, message = "Answer cannot be blank." });
             }
 
-            var cleanExpected = (trial.CorrectAnswer ?? string.Empty).Trim().ToLowerInvariant();
-            var cleanActual = dto.Answer.Trim().ToLowerInvariant();
+            // Strict exact match comparison
+            var expected = Normalize(trial.CorrectAnswer);
+            var submitted = Normalize(dto.Answer);
 
-            bool isCorrect = cleanExpected == cleanActual || 
-                             cleanActual.Contains(cleanExpected) || 
-                             cleanExpected.Contains(cleanActual);
+            bool isCorrect = !string.IsNullOrEmpty(submitted) && expected == submitted;
 
             if (!isCorrect)
             {
@@ -182,6 +187,7 @@ public class LandingController : ControllerBase
 
             int finalReward = trial.RewardPoints;
 
+            // Underdog multiplier
             var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
             var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
 
