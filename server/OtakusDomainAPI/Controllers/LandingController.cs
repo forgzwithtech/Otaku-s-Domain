@@ -56,24 +56,37 @@ public class LandingController : ControllerBase
         return Ok(slides);
     }
 
-    [HttpGet("daily-trial")]
+[HttpGet("daily-trial")]
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
-        var today = DateTime.UtcNow.Date;
-        var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
+        var startOfDay = DateTime.UtcNow.Date;
+        var endOfDay = startOfDay.AddDays(1);
+
+        var trial = await _context.DailyTrials
+            .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay);
 
         if (trial == null)
         {
-            // Auto-persist default trial if missing
-            trial = new DailyTrial 
-            { 
-                Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", 
-                CorrectAnswer = "Oetsu Nimaiya", 
+            trial = new DailyTrial
+            {
+                Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
+                CorrectAnswer = "Oetsu Nimaiya",
                 RewardPoints = 50,
-                ActiveDate = today 
+                ActiveDate = startOfDay
             };
-            _context.DailyTrials.Add(trial);
-            await _context.SaveChangesAsync();
+
+            try
+            {
+                _context.DailyTrials.Add(trial);
+                await _context.SaveChangesAsync();
+            }
+            catch
+            {
+                // Concurrency catch in case multiple simultaneous requests attempt to seed
+                trial = await _context.DailyTrials
+                    .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay)
+                    ?? trial;
+            }
         }
 
         return Ok(trial);
@@ -85,26 +98,29 @@ public class LandingController : ControllerBase
     {
         try
         {
-            var userIdString = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
-            if (!Guid.TryParse(userIdString, out var userId))
-                return Unauthorized(new { success = false, message = "Invalid token subject." });
+            var subClaim = User.FindFirstValue(ClaimTypes.NameIdentifier) ?? User.FindFirstValue("sub");
+            if (!Guid.TryParse(subClaim, out var userId))
+                return Unauthorized(new { success = false, message = "Invalid token authorization claim." });
 
             var user = await _context.UserProfiles.FindAsync(userId);
-            if (user == null) 
-                return NotFound(new { success = false, message = "User profile not found." });
+            if (user == null)
+                return NotFound(new { success = false, message = "User operative dossier not found." });
 
-            var today = DateTime.UtcNow.Date;
-            var trial = await _context.DailyTrials.FirstOrDefaultAsync(t => t.ActiveDate.Date == today);
+            var startOfDay = DateTime.UtcNow.Date;
+            var endOfDay = startOfDay.AddDays(1);
 
-            // Safe fallback if trial has not been created for today yet
+            // Safe range query compatible with PostgreSQL timestamps
+            var trial = await _context.DailyTrials
+                .FirstOrDefaultAsync(t => t.ActiveDate >= startOfDay && t.ActiveDate < endOfDay);
+
             if (trial == null)
             {
-                trial = new DailyTrial 
-                { 
-                    Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?", 
-                    CorrectAnswer = "Oetsu Nimaiya", 
+                trial = new DailyTrial
+                {
+                    Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
+                    CorrectAnswer = "Oetsu Nimaiya",
                     RewardPoints = 50,
-                    ActiveDate = today 
+                    ActiveDate = startOfDay
                 };
                 _context.DailyTrials.Add(trial);
                 await _context.SaveChangesAsync();
@@ -115,8 +131,8 @@ public class LandingController : ControllerBase
                 return BadRequest(new { success = false, message = "Answer cannot be empty." });
             }
 
-            var cleanExpected = (trial.CorrectAnswer ?? string.Empty).Trim().ToLower();
-            var cleanActual = dto.Answer.Trim().ToLower();
+            var cleanExpected = (trial.CorrectAnswer ?? string.Empty).Trim().ToLowerInvariant();
+            var cleanActual = dto.Answer.Trim().ToLowerInvariant();
 
             bool isCorrect = cleanExpected == cleanActual || 
                              cleanActual.Contains(cleanExpected) || 
@@ -129,7 +145,7 @@ public class LandingController : ControllerBase
 
             int finalReward = trial.RewardPoints;
 
-            // Safe Underdog multiplier calculation
+            // Safe underdog bonus calculation
             var blueCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Blue);
             var redCount = await _context.UserProfiles.CountAsync(u => u.Faction == GuildFaction.Red);
 
@@ -144,20 +160,27 @@ public class LandingController : ControllerBase
 
             user.QuestPoints += finalReward;
             user.UpdatedAt = DateTime.UtcNow;
+
             await _context.SaveChangesAsync();
 
-            return Ok(new { 
-                success = true, 
-                rewardPoints = finalReward, 
-                message = $"Correct! +{finalReward} QP added to your ledger." 
+            return Ok(new
+            {
+                success = true,
+                rewardPoints = finalReward,
+                message = $"Correct! +{finalReward} QP added to your ledger."
             });
         }
         catch (Exception ex)
         {
-            return StatusCode(500, new { success = false, message = $"Telemetry failure: {ex.Message}" });
+            // Surfaces precise error detail in the JSON body for diagnostics
+            return StatusCode(500, new
+            {
+                success = false,
+                message = "Telemetry submission error.",
+                detail = ex.InnerException?.Message ?? ex.Message
+            });
         }
     }
-
     [HttpPost("recruit")]
     public async Task<IActionResult> SubmitRecruitment([FromBody] RecruitmentDto dto)
     {
