@@ -9,6 +9,11 @@ using OtakusDomainAPI.Models;
 
 namespace OtakusDomainAPI.Controllers;
 
+public class TriviaSubmissionDto 
+{ 
+    public string Answer { get; set; } = string.Empty;
+    public int? TrialId { get; set; }
+}
 
 [ApiController]
 [Route("api/[controller]")]
@@ -60,30 +65,37 @@ public class LandingController : ControllerBase
     [HttpGet("daily-trial")]
     public async Task<ActionResult<DailyTrial>> GetActiveTrial()
     {
-        var today = DateTime.UtcNow.Date;
+        var now = DateTime.UtcNow;
+        var todayUtcStr = now.ToString("yyyy-MM-dd");
+        var todayWatStr = now.AddHours(1).ToString("yyyy-MM-dd");
 
-        // Fetch trials and perform date check in memory to bypass Npgsql timestamp translation edge cases
         var allTrials = await _context.DailyTrials.ToListAsync();
-        var trial = allTrials.FirstOrDefault(t => t.ActiveDate.ToUniversalTime().Date == today);
 
-        // Fallback: Pick the most recent trial on or before today
+        // 1. Check exact calendar date representation (matches UTC or WAT calendar date string)
+        var trial = allTrials.FirstOrDefault(t => 
+            t.ActiveDate.ToString("yyyy-MM-dd") == todayUtcStr ||
+            t.ActiveDate.ToString("yyyy-MM-dd") == todayWatStr ||
+            t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayUtcStr ||
+            t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayWatStr);
+
+        // 2. Fallback: closest scheduled trial on or before today
         if (trial == null)
         {
             trial = allTrials
-                .Where(t => t.ActiveDate.ToUniversalTime().Date <= today)
+                .Where(t => string.Compare(t.ActiveDate.ToString("yyyy-MM-dd"), todayWatStr) <= 0)
                 .OrderByDescending(t => t.ActiveDate)
                 .FirstOrDefault();
         }
 
-        // Fallback: Default question if table is empty
+        // 3. Fallback: default prompt if database is completely empty
         if (trial == null)
         {
             trial = new DailyTrial
             {
-                Question = "Who forged Ichigo Kurosaki's true dual Zangetsu blades?",
-                CorrectAnswer = "Oetsu Nimaiya",
+                Question = "Who is the captain of the Fourth Division in Bleach?",
+                CorrectAnswer = "Retsu Unohana",
                 RewardPoints = 50,
-                ActiveDate = DateTime.SpecifyKind(today, DateTimeKind.Utc)
+                ActiveDate = DateTime.SpecifyKind(now.Date, DateTimeKind.Utc)
             };
 
             try
@@ -120,21 +132,30 @@ public class LandingController : ControllerBase
 
             DailyTrial? trial = null;
 
-            // 1. Direct match by TrialId sent from frontend
+            // Priority 1: Direct lookup by TrialId passed from Hero.tsx (guarantees validating the exact active question)
             if (dto.TrialId.HasValue && dto.TrialId.Value > 0)
             {
                 trial = await _context.DailyTrials.FindAsync(dto.TrialId.Value);
             }
 
-            // 2. Date-based match if TrialId was not provided
+            // Priority 2: Calendar date match
             if (trial == null)
             {
-                var today = DateTime.UtcNow.Date;
+                var now = DateTime.UtcNow;
+                var todayUtcStr = now.ToString("yyyy-MM-dd");
+                var todayWatStr = now.AddHours(1).ToString("yyyy-MM-dd");
+
                 var allTrials = await _context.DailyTrials.ToListAsync();
-                trial = allTrials.FirstOrDefault(t => t.ActiveDate.ToUniversalTime().Date == today)
-                        ?? allTrials.Where(t => t.ActiveDate.ToUniversalTime().Date <= today)
-                                    .OrderByDescending(t => t.ActiveDate)
-                                    .FirstOrDefault();
+
+                trial = allTrials.FirstOrDefault(t => 
+                    t.ActiveDate.ToString("yyyy-MM-dd") == todayUtcStr ||
+                    t.ActiveDate.ToString("yyyy-MM-dd") == todayWatStr ||
+                    t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayUtcStr ||
+                    t.ActiveDate.ToUniversalTime().ToString("yyyy-MM-dd") == todayWatStr)
+                    ?? allTrials
+                        .Where(t => string.Compare(t.ActiveDate.ToString("yyyy-MM-dd"), todayWatStr) <= 0)
+                        .OrderByDescending(t => t.ActiveDate)
+                        .FirstOrDefault();
             }
 
             if (trial == null)

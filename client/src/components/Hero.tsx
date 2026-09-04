@@ -1,4 +1,3 @@
-// client/src/components/Hero.tsx
 import React, { useState, useEffect, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import pageFlipSound from "../assets/page.ogg";
@@ -33,8 +32,10 @@ interface SlideData {
 }
 
 interface DailyTrialData {
+  id?: number;
   question: string;
   rewardPoints: number;
+  activeDate?: string;
 }
 
 interface HeroProps {
@@ -120,7 +121,6 @@ function SlidePanel({ slide, isFlipping = false }: { slide: SlideData; isFlippin
       navigate(slide.targetUrl);
       return;
     }
-    // Intelligent fallback based on button text / panel keywords
     const btnLow = slide.btn.toLowerCase();
     if (btnLow.includes("ticket") || btnLow.includes("event") || btnLow.includes("fest")) {
       navigate("/events");
@@ -195,15 +195,10 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
   const [answerInput, setAnswerInput] = useState("");
   const [trialStatus, setTrialStatus] = useState<string | null>(null);
 
-  // Recruitment state
   const [socialHandle, setSocialHandle] = useState("");
   const [recruitStatus, setRecruitStatus] = useState<string | null>(null);
   
-  const todayKey = `trial_solved_${new Date().toISOString().split('T')[0]}`;
-  const [isCompleted, setIsCompleted] = useState<boolean>(() => {
-    return localStorage.getItem(todayKey) === "true";
-  });
-  
+  const [isCompleted, setIsCompleted] = useState<boolean>(false);
   const [loading, setLoading] = useState<boolean>(true);
   const [current, setCurrent] = useState<number>(0);
   const [pending, setPending] = useState<number | null>(null);
@@ -245,7 +240,11 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
 
         if (trialRes.ok) {
           const trialData = await trialRes.json();
-          if (trialData) setDailyTrial(trialData);
+          if (trialData) {
+            setDailyTrial(trialData);
+            const trialKey = `trial_solved_${trialData.id || "today"}`;
+            setIsCompleted(localStorage.getItem(trialKey) === "true");
+          }
         }
       } catch (err) {
         console.error("Failed to sync landing feed:", err);
@@ -313,19 +312,24 @@ export default function Hero({ guild = DEFAULT_GUILD }: HeroProps) {
         return;
       }
 
+      // Explicitly send trialId to verify against the active question
       const res = await fetch(`${apiBase}/landing/submit-trial`, {
         method: 'POST',
         headers: { 
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${token}`
         },
-        body: JSON.stringify({ answer: answerInput })
+        body: JSON.stringify({ 
+          answer: answerInput, 
+          trialId: dailyTrial.id 
+        })
       });
       
       const data = await res.json();
       if (res.ok && data.success) {
         setIsCompleted(true);
-        localStorage.setItem(todayKey, "true");
+        const trialKey = `trial_solved_${dailyTrial.id || "today"}`;
+        localStorage.setItem(trialKey, "true");
         setTrialStatus(data.message);
       } else {
         setTrialStatus(data.message || "Incorrect answer.");
